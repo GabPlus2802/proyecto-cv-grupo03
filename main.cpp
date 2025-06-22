@@ -1,3 +1,4 @@
+
 #include <GL/glut.h>
 #include <iostream>
 #include <vector>
@@ -39,6 +40,13 @@ bool juegoTerminado = false;
 float cameraDistancia = 15.0f;
 float cameraAngulo = 0.0f;
 float cameraAltura = 5.0f;
+bool acelerando = false;
+
+// Variables para controlar el movimiento del mouse y la rotación de la cámara
+bool mousePresionado = false; // Estado del botón izquierdo/derecho del mouse
+int mousePosX, mousePosY; // Posición del mouse en la pantalla
+float deltaAnguloX = 0.0f; // Desplazamiento horizontal de la cámara
+float deltaAnguloY = 0.0f; // Desplazamiento vertical de la cámara
 
 // Función para convertir int a string (compatible con versiones antiguas de C++)
 std::string intToString(int numero) {
@@ -399,14 +407,13 @@ void actualizar()
             asteroides[i].y += asteroides[i].vy;
             asteroides[i].z += asteroides[i].vz;
 
-            // Eliminar asteroide si está muy lejos o muy cerca
             float distanciaNave = sqrt(pow(asteroides[i].x - naveX, 2) +
                                        pow(asteroides[i].y - naveY, 2) +
                                        pow(asteroides[i].z - naveZ, 2));
 
             if(distanciaNave > 30 || asteroides[i].z > 10) {
                 asteroides.erase(asteroides.begin() + i);
-                i--; // Ajustar índice después de eliminar
+                i--;
                 continue;
             }
 
@@ -487,13 +494,12 @@ void display()
         glMatrixMode(GL_MODELVIEW);
         glLoadIdentity();
 
-        // Cámara que sigue a la nave pero con un offset fijo
-        float camX = sin(cameraAngulo) * cameraDistancia;
-        float camZ = cos(cameraAngulo) * cameraDistancia + 5.0f; // Posición más fija
+        // Cámara que sigue a la nave, pero también permite rotación con el mouse
+        float camX = sin(cameraAngulo + deltaAnguloX) * cameraDistancia;
+        float camZ = cos(cameraAngulo + deltaAnguloX) * cameraDistancia + 5.0f; // Posición más fija
+        float camY = cameraAltura + deltaAnguloY;
 
-        gluLookAt(camX, cameraAltura, camZ,
-                  naveX, naveY, naveZ,  // Mira hacia la nave
-                  0.0f, 1.0f, 0.0f);
+        gluLookAt(camX, camY, camZ, naveX, naveY, naveZ, 0.0f, 1.0f, 0.0f);
 
         // Dibujar elementos del juego
         dibujarNave();
@@ -624,11 +630,30 @@ void mouse(int button, int state, int x, int y)
     if(juegoTerminado) return; // No procesar mouse si el juego terminó
 
     if(button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
-        cameraAngulo += 0.2f;
+        mousePresionado = true;
+        mousePosX = x;
+        mousePosY = y;
+    } else if(button == GLUT_LEFT_BUTTON && state == GLUT_UP) {
+        mousePresionado = false;
     }
-    if(button == GLUT_RIGHT_BUTTON && state == GLUT_DOWN) {
-        cameraAngulo -= 0.2f;
-    }
+}
+
+// Función de movimiento del mouse mientras se mantiene presionado
+void movimientoMouse(int x, int y)
+{
+    if (!mousePresionado) return;
+
+    // Calcular el desplazamiento del mouse desde la última posición
+    deltaAnguloX += (x - mousePosX) * 0.1f; // Aceleramos el movimiento horizontal
+    deltaAnguloY -= (y - mousePosY) * 0.1f; // Aceleramos el movimiento vertical
+
+    // Limitar el movimiento en el eje vertical para evitar que la cámara gire completamente
+    if (deltaAnguloY > 90.0f) deltaAnguloY = 90.0f;
+    if (deltaAnguloY < -90.0f) deltaAnguloY = -90.0f;
+
+    // Actualizar la posición del mouse
+    mousePosX = x;
+    mousePosY = y;
 }
 
 // Función de animación
@@ -675,6 +700,7 @@ int main(int argc, char** argv)
     glutKeyboardFunc(keyboard);
     glutSpecialFunc(specialKeys);
     glutMouseFunc(mouse);
+    glutMotionFunc(movimientoMouse); // Agregar para mover el mouse
     glutTimerFunc(0, timer, 0);
 
     glutMainLoop();
