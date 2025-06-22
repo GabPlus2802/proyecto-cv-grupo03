@@ -1,0 +1,27 @@
+# depslib dependency file v1.0
+1750136811 source:c:\users\user\desktop\ciclo 2025-1\20118062 - computaci”n visual\clase 04\ejetrcicios labo 04\proyectogrupo3\main.cpp
+	<GL/glut.h>
+	<iostream>
+	<vector>
+	<cmath>
+	<cstdlib>
+	<ctime>
+
+935113144 c:\program files\codeblocks\glut\include\gl\glut.h
+	<windows.h>
+	<GL/gl.h>
+	<GL/glu.h>
+
+832837944 c:\program files\codeblocks\glut\include\gl\gl.h
+
+832394118 c:\program files\codeblocks\glut\include\gl\glu.h
+	<GL/gl.h>
+
+1750562747 source:c:\users\user\desktop\proyectogrupo3\main.cpp
+	<GL/glut.h>
+	<iostream>
+	<vector>
+	<cmath>
+	<cstdlib>
+	<ctime>
+
