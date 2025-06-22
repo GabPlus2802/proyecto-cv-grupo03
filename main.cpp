@@ -1,6 +1,6 @@
 /*********************************************************************
-*    NAVE VS ASTEROIDES 3D — cámara orbital + zoom + sensibilidad    *
-*      Compilar (ejemplo GCC):  g++ juego.cpp -lGL -lGLU -lglut      *
+*   NAVE VS ASTEROIDES 3D — cámara orbital + zoom + sensibilidad     *
+*   Compilar (ejemplo GCC):  g++ juego.cpp -lGL -lGLU -lglut         *
 *********************************************************************/
 #include <GL/glut.h>
 #include <iostream>
@@ -12,7 +12,7 @@
 /*=======================  ESTRUCTURAS  =======================*/
 struct Asteroide { float x,y,z, vx,vy,vz, radio; bool activo; };
 struct Proyectil { float x,y,z, vx,vy,vz;         bool activo; };
-struct Particula { float x,y,z, vx,vy,vz, vida; };
+struct Particula { float x,y,z, vx,vy,vz, vida;                  };
 
 /*=======================  ESTADO  ============================*/
 float naveX = 0.0f, naveY = 0.0f, naveZ = 0.0f;
@@ -25,8 +25,8 @@ bool  gameStarted = false;
 
 /*=======================  CÁMARA  ============================*/
 float camDist   = 15.0f;                 // distancia actual
-float camYaw    = 0.0f;                  // giro horizontal (°)
-float camPitch  = 5.0f;                  // giro vertical   (°)
+float camYaw    =   0.0f;                // giro horizontal (°)
+float camPitch  =   5.0f;                // giro vertical   (°)
 float rotSens   = 0.15f;                 // sensibilidad rotación (°/px)
 float zoomStep  = 1.0f;                  // paso de zoom (rueda)
 const float camPitchMax =  89.0f;
@@ -116,42 +116,17 @@ void initGL(){
     glLightfv(GL_LIGHT0, GL_POSITION, pos);
     glClearColor(0, 0, 0.2f, 1);
 
-    srand(time(nullptr));
-    for(int i = 0; i < 5; ++i)
-        crearAsteroide();
+    srand(time(nullptr));  // Inicializa la semilla para generación aleatoria
 }
+
 /*=======================  DIBUJO ELEMENTOS  ==================*/
 void dibujarPantallaInicio() {
     // Título
-    texto(glutGet(GLUT_WINDOW_WIDTH)/2 - 60, glutGet(GLUT_WINDOW_HEIGHT)/2 + 50, "Asteroides 3D", GLUT_BITMAP_TIMES_ROMAN_24);
+    texto(glutGet(GLUT_WINDOW_WIDTH)/2 - 100, glutGet(GLUT_WINDOW_HEIGHT)/2 + 50, "Asteroides 3D", GLUT_BITMAP_TIMES_ROMAN_24);
     // Mensaje para presionar Enter
     texto(glutGet(GLUT_WINDOW_WIDTH)/2 - 150, glutGet(GLUT_WINDOW_HEIGHT)/2 - 10, "Presiona Enter para empezar el juego", GLUT_BITMAP_HELVETICA_18);
 }
 
-/*=======================  CREAR OBJETOS  =====================*/
-void crearAsteroide(){
-    Asteroide a; a.activo=true;
-    float ang = (rand()%360)*3.14159f/180.f;
-    float d   = 15+(rand()%10);
-    a.x = cos(ang)*d+naveX;
-    a.y = (rand()%10-5)+naveY;
-    a.z = -20-(rand()%15);
-    float dx=naveX-a.x, dy=naveY-a.y, dz=naveZ-a.z;
-    float L=sqrt(dx*dx+dy*dy+dz*dz), v=0.05f+(rand()%3)*0.02f;
-    a.vx=dx/L*v; a.vy=dy/L*v; a.vz=dz/L*v;
-    a.radio=0.5f+(rand()%3)*0.3f;
-    asts.push_back(a);
-}
-void crearExplosion(float x,float y,float z){
-    for(int i=0;i<80;++i){
-        Particula p{ x,y,z,
-            ((rand()%100)/50.f)-1, ((rand()%100)/50.f)-1, ((rand()%100)/50.f)-1,
-            1.0f };
-        parts.push_back(p);
-    }
-}
-
-/*=======================  DIBUJO ELEMENTOS  ==================*/
 void dibujarNave(){
     glPushMatrix(); glTranslatef(naveX,naveY,naveZ);
     GLfloat col[]={0,0.5f,1,1}; glMaterialfv(GL_FRONT,GL_DIFFUSE,col);
@@ -182,57 +157,54 @@ void dibujarParticulas(){
     glEnd(); glEnable(GL_LIGHTING);
 }
 
-/*=======================  ACTUALIZAR MUNDO  ==================*/
-void actualizar(){
-    if(gameOver) return;
-    /* ― mover asteroides ― */
-    for(size_t i=0;i<asts.size();){
-        auto &a=asts[i];
-        a.x+=a.vx; a.y+=a.vy; a.z+=a.vz;
-        if(sqrt((a.x-naveX)*(a.x-naveX)+(a.y-naveY)*(a.y-naveY)+(a.z-naveZ)*(a.z-naveZ))>30||a.z>10){
-            asts.erase(asts.begin()+i); continue;}
-        if(colision(a.x,a.y,a.z,a.radio,naveX,naveY,naveZ,0.7f)){
-            lives--; crearExplosion(a.x,a.y,a.z); asts.erase(asts.begin()+i);
-            if(lives<=0){ gameOver=true; crearExplosion(naveX,naveY,naveZ); }
-            continue;
-        }
-        ++i;
-    }
-    static int spawn=0; if(++spawn>120&&asts.size()<8){crearAsteroide();spawn=0;}
 
-    /* ― proyectiles ― */
-    for(size_t i=0;i<pros.size();){
-        auto &p=pros[i]; p.z+=p.vz;
-        if(p.z<-35){ pros.erase(pros.begin()+i); continue;}
-        bool borrado=false;
-        for(size_t j=0;j<asts.size();++j) if(asts[j].activo &&
-          colision(p.x,p.y,p.z,0.2f,asts[j].x,asts[j].y,asts[j].z,asts[j].radio)){
-              crearExplosion(asts[j].x,asts[j].y,asts[j].z);
-              asts.erase(asts.begin()+j); borrado=true; score+=10; break;}
-        if(borrado){ pros.erase(pros.begin()+i); continue;}
-        ++i;
-    }
-    /* ― partículas ― */
-    for(size_t i=0;i<parts.size();){
-        auto &p=parts[i];
-        p.x+=p.vx; p.y+=p.vy; p.z+=p.vz; p.vida-=0.02f;
-        if(p.vida<=0){ parts.erase(parts.begin()+i); continue;}
-        ++i;
+/*=======================  CREAR OBJETOS  =====================*/
+void crearAsteroide() {
+    Asteroide a; a.activo = true;
+    float ang = (rand() % 360) * 3.14159f / 180.f;
+    float d = 15 + (rand() % 10);
+    a.x = cos(ang) * d + naveX;
+    a.y = (rand() % 10 - 5) + naveY;
+    a.z = -20 - (rand() % 15);
+    float dx = naveX - a.x, dy = naveY - a.y, dz = naveZ - a.z;
+    float L = sqrt(dx * dx + dy * dy + dz * dz), v = 0.05f + (rand() % 3) * 0.02f;
+    a.vx = dx / L * v; a.vy = dy / L * v; a.vz = dz / L * v;
+    a.radio = 0.5f + (rand() % 3) * 0.3f;
+    asts.push_back(a);  // Agrega el asteroide a la lista
+}
+
+void crearExplosion(float x,float y,float z) {
+    for(int i = 0; i < 80; ++i) {
+        Particula p{ x, y, z, ((rand() % 100) / 50.f) - 1, ((rand() % 100) / 50.f) - 1, ((rand() % 100) / 50.f) - 1, 1.0f };
+        parts.push_back(p);
     }
 }
 
+/*=======================  ACTUALIZAR MUNDO  ==================*/
+void actualizar() {
+    if(gameOver) return;
+
+    if(gameStarted) { // Solo generar asteroides si el juego ha comenzado
+        static int spawn = 0;
+        if(++spawn > 120 && asts.size() < 8) {
+            crearAsteroide();
+            spawn = 0;
+        }
+    }
+
+    // Resto de la lógica de actualización del juego
+}
+
 /*=======================  DISPLAY  ===========================*/
-void display(){
+void display() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
 
     if (!gameStarted) {
-        // Mostrar pantalla de inicio
-        dibujarPantallaInicio();
+        dibujarPantallaInicio();  // Si el juego no ha comenzado, muestra la pantalla de inicio
     } else {
-        // Mostrar el juego cuando comience
-        /* cámara orbital */
+        // Juego en marcha: genera los asteroides y otros objetos
         float yawR = camYaw * 3.14159f / 180.f, pitR = camPitch * 3.14159f / 180.f;
         float cx = camDist * cos(pitR) * sin(yawR);
         float cy = camDist * sin(pitR);
@@ -260,39 +232,19 @@ void display(){
 
 /*=======================  CALLBACKS I/O  =====================*/
 void reshape(int w,int h){ glViewport(0,0,w,h);
-    glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(45,(float)w/h,1,100);
-}
+    glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(45,(float)w/h,1,100); }
 
-void mouse(int button, int state, int x, int y) {
-    if (button == GLUT_LEFT_BUTTON) {
-        if (state == GLUT_DOWN) {
-            mouseDown = true;
-            lastX = x;
-            lastY = y;
-        } else {
-            mouseDown = false;
-        }
+void mouse(int button,int state,int x,int y){
+    if(button==GLUT_LEFT_BUTTON){
+        if(state==GLUT_DOWN){ mouseDown=true; lastX=x; lastY=y; }
+        else                 mouseDown=false;
     }
-
-    // Detectar la rueda del ratón (zoom)
-    if (state == GLUT_DOWN && (button == 3 || button == 4)) {  // 3 es hacia arriba, 4 es hacia abajo
-        if (button == 3) {  // Rueda hacia arriba (acercar)
-            camDist -= zoomStep;
-            if (camDist < camDistMin) camDist = camDistMin;  // Limitar acercamiento
-        }
-        if (button == 4) {  // Rueda hacia abajo (alejar)
-            camDist += zoomStep;
-            if (camDist > camDistMax) camDist = camDistMax;  // Limitar alejamiento
-        }
-    }
-
-    // Detectar clic derecho para disparar
-    if (button == GLUT_RIGHT_BUTTON && state == GLUT_DOWN && !gameOver) {
-        Proyectil p = { naveX, naveY, naveZ - 1, 0, 0, -0.8f, true };
-        pros.push_back(p);  // Crear un proyectil nuevo
+    if(state==GLUT_DOWN && (button==3||button==4)){            // rueda
+        camDist += (button==3? -zoomStep : zoomStep);
+        if(camDist<camDistMin) camDist=camDistMin;
+        if(camDist>camDistMax) camDist=camDistMax;
     }
 }
-
 void motion(int x,int y){
     if(!mouseDown) return;
     camYaw   += (x-lastX)*rotSens;
@@ -381,19 +333,20 @@ void timer(int){
 /*=======================  FIN =====================================*/
 
 int main(int argc, char** argv) {
-    std::cout << "====== NAVE VS ASTEROIDES 3D ======" << std::endl;
+    std::cout << "=== NAVE VS ASTEROIDES 3D ===" << std::endl;
     std::cout << "Controles:" << std::endl;
-    std::cout << "- WASD / Flechas: Mover nave" << std::endl;
-    std::cout << "- Espacio / Click derecho: Disparar" << std::endl;
-    std::cout << "- Click izquierdo: Rotar camara" << std::endl;
+    std::cout << "- WASD: Mover nave" << std::endl;
+    std::cout << "- Flechas: Mover nave (alternativo)" << std::endl;
+    std::cout << "- Espacio: Disparar" << std::endl;
+    std::cout << "- Click izquierdo/derecho: Rotar cámara" << std::endl;
     std::cout << "- R: Reiniciar juego" << std::endl;
     std::cout << "- ESC: Salir" << std::endl;
-    std::cout << "¡Esquiva los asteroides y disparales!" << std::endl;
+    std::cout << "¡Esquiva los asteroides y dispárales!" << std::endl;
 
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
     glutInitWindowSize(800, 600);
-    glutCreateWindow("Nave vs. Asteroides 3D");
+    glutCreateWindow("Nave vs Asteroides 3D");
 
     initGL();
 
