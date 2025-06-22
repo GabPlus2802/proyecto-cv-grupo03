@@ -1,6 +1,6 @@
 /*********************************************************************
-*   NAVE VS ASTEROIDES 3D — cámara orbital + zoom + sensibilidad     *
-*   Compilar (ejemplo GCC):  g++ juego.cpp -lGL -lGLU -lglut         *
+*    NAVE VS ASTEROIDES 3D — cámara orbital + zoom + sensibilidad    *
+*      Compilar (ejemplo GCC):  g++ juego.cpp -lGL -lGLU -lglut      *
 *********************************************************************/
 #include <GL/glut.h>
 #include <iostream>
@@ -12,7 +12,7 @@
 /*=======================  ESTRUCTURAS  =======================*/
 struct Asteroide { float x,y,z, vx,vy,vz, radio; bool activo; };
 struct Proyectil { float x,y,z, vx,vy,vz;         bool activo; };
-struct Particula { float x,y,z, vx,vy,vz, vida;                  };
+struct Particula { float x,y,z, vx,vy,vz, vida; };
 
 /*=======================  ESTADO  ============================*/
 float naveX = 0.0f, naveY = 0.0f, naveZ = 0.0f;
@@ -25,8 +25,8 @@ bool  gameStarted = false;
 
 /*=======================  CÁMARA  ============================*/
 float camDist   = 15.0f;                 // distancia actual
-float camYaw    =   0.0f;                // giro horizontal (°)
-float camPitch  =   5.0f;                // giro vertical   (°)
+float camYaw    = 0.0f;                  // giro horizontal (°)
+float camPitch  = 5.0f;                  // giro vertical   (°)
 float rotSens   = 0.15f;                 // sensibilidad rotación (°/px)
 float zoomStep  = 1.0f;                  // paso de zoom (rueda)
 const float camPitchMax =  89.0f;
@@ -123,7 +123,7 @@ void initGL(){
 /*=======================  DIBUJO ELEMENTOS  ==================*/
 void dibujarPantallaInicio() {
     // Título
-    texto(glutGet(GLUT_WINDOW_WIDTH)/2 - 100, glutGet(GLUT_WINDOW_HEIGHT)/2 + 50, "Asteroides 3D", GLUT_BITMAP_TIMES_ROMAN_24);
+    texto(glutGet(GLUT_WINDOW_WIDTH)/2 - 60, glutGet(GLUT_WINDOW_HEIGHT)/2 + 50, "Asteroides 3D", GLUT_BITMAP_TIMES_ROMAN_24);
     // Mensaje para presionar Enter
     texto(glutGet(GLUT_WINDOW_WIDTH)/2 - 150, glutGet(GLUT_WINDOW_HEIGHT)/2 - 10, "Presiona Enter para empezar el juego", GLUT_BITMAP_HELVETICA_18);
 }
@@ -260,19 +260,39 @@ void display(){
 
 /*=======================  CALLBACKS I/O  =====================*/
 void reshape(int w,int h){ glViewport(0,0,w,h);
-    glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(45,(float)w/h,1,100); }
+    glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(45,(float)w/h,1,100);
+}
 
-void mouse(int button,int state,int x,int y){
-    if(button==GLUT_LEFT_BUTTON){
-        if(state==GLUT_DOWN){ mouseDown=true; lastX=x; lastY=y; }
-        else                 mouseDown=false;
+void mouse(int button, int state, int x, int y) {
+    if (button == GLUT_LEFT_BUTTON) {
+        if (state == GLUT_DOWN) {
+            mouseDown = true;
+            lastX = x;
+            lastY = y;
+        } else {
+            mouseDown = false;
+        }
     }
-    if(state==GLUT_DOWN && (button==3||button==4)){            // rueda
-        camDist += (button==3? -zoomStep : zoomStep);
-        if(camDist<camDistMin) camDist=camDistMin;
-        if(camDist>camDistMax) camDist=camDistMax;
+
+    // Detectar la rueda del ratón (zoom)
+    if (state == GLUT_DOWN && (button == 3 || button == 4)) {  // 3 es hacia arriba, 4 es hacia abajo
+        if (button == 3) {  // Rueda hacia arriba (acercar)
+            camDist -= zoomStep;
+            if (camDist < camDistMin) camDist = camDistMin;  // Limitar acercamiento
+        }
+        if (button == 4) {  // Rueda hacia abajo (alejar)
+            camDist += zoomStep;
+            if (camDist > camDistMax) camDist = camDistMax;  // Limitar alejamiento
+        }
+    }
+
+    // Detectar clic derecho para disparar
+    if (button == GLUT_RIGHT_BUTTON && state == GLUT_DOWN && !gameOver) {
+        Proyectil p = { naveX, naveY, naveZ - 1, 0, 0, -0.8f, true };
+        pros.push_back(p);  // Crear un proyectil nuevo
     }
 }
+
 void motion(int x,int y){
     if(!mouseDown) return;
     camYaw   += (x-lastX)*rotSens;
@@ -361,20 +381,19 @@ void timer(int){
 /*=======================  FIN =====================================*/
 
 int main(int argc, char** argv) {
-    std::cout << "=== NAVE VS ASTEROIDES 3D ===" << std::endl;
+    std::cout << "====== NAVE VS ASTEROIDES 3D ======" << std::endl;
     std::cout << "Controles:" << std::endl;
-    std::cout << "- WASD: Mover nave" << std::endl;
-    std::cout << "- Flechas: Mover nave (alternativo)" << std::endl;
-    std::cout << "- Espacio: Disparar" << std::endl;
-    std::cout << "- Click izquierdo/derecho: Rotar cámara" << std::endl;
+    std::cout << "- WASD / Flechas: Mover nave" << std::endl;
+    std::cout << "- Espacio / Click derecho: Disparar" << std::endl;
+    std::cout << "- Click izquierdo: Rotar camara" << std::endl;
     std::cout << "- R: Reiniciar juego" << std::endl;
     std::cout << "- ESC: Salir" << std::endl;
-    std::cout << "¡Esquiva los asteroides y dispárales!" << std::endl;
+    std::cout << "¡Esquiva los asteroides y disparales!" << std::endl;
 
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
     glutInitWindowSize(800, 600);
-    glutCreateWindow("Nave vs Asteroides 3D");
+    glutCreateWindow("Nave vs. Asteroides 3D");
 
     initGL();
 
