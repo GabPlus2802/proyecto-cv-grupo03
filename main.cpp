@@ -4,17 +4,18 @@
 #include <cmath>
 #include <cstdlib>
 #include <ctime>
+#include <sstream>
 
 // Estructuras simplificadas
 struct Asteroide {
-    float x, y, z;           // Posición
+    float x, y, z;           // PosiciÃ³n
     float vx, vy, vz;        // Velocidad
     float radio;
     bool activo;
 };
 
 struct Proyectil {
-    float x, y, z;           // Posición
+    float x, y, z;           // PosiciÃ³n
     float vx, vy, vz;        // Velocidad
     bool activo;
 };
@@ -22,8 +23,9 @@ struct Proyectil {
 struct Particula {
     float x, y, z;
     float vx, vy, vz;
-    float vida; // Tiempo de vida de la partícula
+    float vida; // Tiempo de vida de la partÃ­cula
 };
+
 // Estado del juego
 float naveX = 0.0f, naveY = 0.0f, naveZ = 0.0f;
 std::vector<Asteroide> asteroides;
@@ -31,18 +33,179 @@ std::vector<Proyectil> proyectiles;
 std::vector<Particula> particulas;
 int puntuacion = 0;
 int vidas = 3;
+bool juegoTerminado = false;
 
-// Cámara
+// CÃ¡mara
 float cameraDistancia = 15.0f;
 float cameraAngulo = 0.0f;
 float cameraAltura = 5.0f;
 
-// Función para crear un asteroide que se dirija hacia la nave
+// FunciÃ³n para convertir int a string (compatible con versiones antiguas de C++)
+std::string intToString(int numero) {
+    std::stringstream ss;
+    ss << numero;
+    return ss.str();
+}
+
+// FunciÃ³n para dibujar texto en pantalla
+void dibujarTexto(float x, float y, const char* texto, void* fuente = GLUT_BITMAP_HELVETICA_18) {
+    glMatrixMode(GL_PROJECTION);
+    glPushMatrix();
+    glLoadIdentity();
+    glOrtho(0, glutGet(GLUT_WINDOW_WIDTH), 0, glutGet(GLUT_WINDOW_HEIGHT), -1, 1);
+
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glLoadIdentity();
+
+    glDisable(GL_LIGHTING);
+    glDisable(GL_DEPTH_TEST);
+
+    glRasterPos2f(x, y);
+    for(const char* c = texto; *c != '\0'; c++) {
+        glutBitmapCharacter(fuente, *c);
+    }
+
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_LIGHTING);
+
+    glPopMatrix();
+    glMatrixMode(GL_PROJECTION);
+    glPopMatrix();
+    glMatrixMode(GL_MODELVIEW);
+}
+
+// FunciÃ³n para dibujar un corazÃ³n simple usando primitivas OpenGL
+void dibujarCorazon(float x, float y, float tamanio) {
+    glMatrixMode(GL_PROJECTION);
+    glPushMatrix();
+    glLoadIdentity();
+    glOrtho(0, glutGet(GLUT_WINDOW_WIDTH), 0, glutGet(GLUT_WINDOW_HEIGHT), -1, 1);
+
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glLoadIdentity();
+
+    glDisable(GL_LIGHTING);
+    glDisable(GL_DEPTH_TEST);
+
+    glColor3f(1.0f, 0.0f, 0.0f); // Color rojo para el corazÃ³n
+
+    // Dibujar corazÃ³n usando triÃ¡ngulos y cÃ­rculos
+    glPushMatrix();
+    glTranslatef(x, y, 0);
+    glScalef(tamanio, tamanio, 1.0f);
+
+    // Parte superior izquierda del corazÃ³n (cÃ­rculo)
+    glBegin(GL_TRIANGLE_FAN);
+    glVertex2f(-5, 5);
+    for(int i = 0; i <= 180; i += 10) {
+        float rad = i * 3.14159f / 180.0f;
+        glVertex2f(-5 + 5 * cos(rad), 5 + 5 * sin(rad));
+    }
+    glEnd();
+
+    // Parte superior derecha del corazÃ³n (cÃ­rculo)
+    glBegin(GL_TRIANGLE_FAN);
+    glVertex2f(5, 5);
+    for(int i = 0; i <= 180; i += 10) {
+        float rad = i * 3.14159f / 180.0f;
+        glVertex2f(5 + 5 * cos(rad), 5 + 5 * sin(rad));
+    }
+    glEnd();
+
+    // Parte inferior del corazÃ³n (triÃ¡ngulo)
+    glBegin(GL_TRIANGLES);
+    glVertex2f(-10, 5);
+    glVertex2f(10, 5);
+    glVertex2f(0, -10);
+    glEnd();
+
+    glPopMatrix();
+
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_LIGHTING);
+
+    glPopMatrix();
+    glMatrixMode(GL_PROJECTION);
+    glPopMatrix();
+    glMatrixMode(GL_MODELVIEW);
+}
+
+// FunciÃ³n para dibujar la interfaz de usuario
+void dibujarUI() {
+    // Dibujar puntuaciÃ³n
+    glColor3f(1.0f, 1.0f, 1.0f); // Blanco
+    std::string scoreText = "Score: " + intToString(puntuacion);
+    dibujarTexto(10, glutGet(GLUT_WINDOW_HEIGHT) - 30, scoreText.c_str());
+
+    // Dibujar vidas con corazones
+    glColor3f(1.0f, 1.0f, 1.0f); // Blanco
+    dibujarTexto(10, glutGet(GLUT_WINDOW_HEIGHT) - 60, "Lives:");
+
+    // Dibujar corazones para cada vida
+    for(int i = 0; i < vidas; i++) {
+        dibujarCorazon(80 + i * 35, glutGet(GLUT_WINDOW_HEIGHT) - 55, 1.0f);
+    }
+}
+
+// FunciÃ³n para dibujar pantalla de Game Over
+void dibujarGameOver() {
+    glDisable(GL_LIGHTING);
+    glDisable(GL_DEPTH_TEST);
+
+    // Fondo semi-transparente
+    glMatrixMode(GL_PROJECTION);
+    glPushMatrix();
+    glLoadIdentity();
+    glOrtho(0, glutGet(GLUT_WINDOW_WIDTH), 0, glutGet(GLUT_WINDOW_HEIGHT), -1, 1);
+
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glLoadIdentity();
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glColor4f(0.0f, 0.0f, 0.0f, 0.7f); // Negro semi-transparente
+
+    glBegin(GL_QUADS);
+    glVertex2f(0, 0);
+    glVertex2f(glutGet(GLUT_WINDOW_WIDTH), 0);
+    glVertex2f(glutGet(GLUT_WINDOW_WIDTH), glutGet(GLUT_WINDOW_HEIGHT));
+    glVertex2f(0, glutGet(GLUT_WINDOW_HEIGHT));
+    glEnd();
+
+    glDisable(GL_BLEND);
+
+    // Texto de Game Over
+    glColor3f(1.0f, 0.0f, 0.0f); // Rojo
+    int windowWidth = glutGet(GLUT_WINDOW_WIDTH);
+    int windowHeight = glutGet(GLUT_WINDOW_HEIGHT);
+
+    dibujarTexto(windowWidth/2 - 80, windowHeight/2 + 50, "GAME OVER", GLUT_BITMAP_TIMES_ROMAN_24);
+
+    glColor3f(1.0f, 1.0f, 1.0f); // Blanco
+    std::string finalScore = "Final Score: " + intToString(puntuacion);
+    dibujarTexto(windowWidth/2 - 60, windowHeight/2 + 10, finalScore.c_str());
+
+    dibujarTexto(windowWidth/2 - 100, windowHeight/2 - 30, "Press 'R' to restart");
+    dibujarTexto(windowWidth/2 - 80, windowHeight/2 - 60, "Press ESC to exit");
+
+    glPopMatrix();
+    glMatrixMode(GL_PROJECTION);
+    glPopMatrix();
+    glMatrixMode(GL_MODELVIEW);
+
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_LIGHTING);
+}
+
+// FunciÃ³n para crear un asteroide que se dirija hacia la nave
 void crearAsteroide()
 {
     Asteroide ast;
 
-    // Generar posición inicial aleatoria en el perímetro
+    // Generar posiciÃ³n inicial aleatoria en el perÃ­metro
     float angulo = (rand() % 360) * 3.14159f / 180.0f;
     float distancia = 15 + (rand() % 10); // Distancia desde la nave
 
@@ -67,6 +230,7 @@ void crearAsteroide()
 
     asteroides.push_back(ast);
 }
+
 void crearExplosion(float x, float y, float z)
 {
     for(int i = 0; i < 100; i++) {
@@ -77,7 +241,7 @@ void crearExplosion(float x, float y, float z)
         p.vx = ((rand() % 100) / 50.0f) - 1.0f; // Movimiento aleatorio
         p.vy = ((rand() % 100) / 50.0f) - 1.0f;
         p.vz = ((rand() % 100) / 50.0f) - 1.0f;
-        p.vida = 1.0f; // Tiempo de vida de la partícula
+        p.vida = 1.0f; // Tiempo de vida de la partÃ­cula
         particulas.push_back(p);
     }
 }
@@ -86,7 +250,7 @@ void dibujarParticulas()
 {
     glPointSize(3.0f);
     glBegin(GL_POINTS);
-    for(int i = 0; i < particulas.size(); i++) {
+    for(size_t i = 0; i < particulas.size(); i++) {
         particulas[i].x += particulas[i].vx;
         particulas[i].y += particulas[i].vy;
         particulas[i].z += particulas[i].vz;
@@ -99,71 +263,53 @@ void dibujarParticulas()
     }
     glEnd();
 }
-// Función para inicializar OpenGL
+
+// FunciÃ³n para inicializar OpenGL
 void inicializar()
 {
-    glEnable(GL_DEPTH_TEST);// calcule qué objetos están delante o detrás de otros
-    glEnable(GL_LIGHTING);//muestra los objetos con iluminacion segun el angulo
-    // dem la camara o luz
-    glEnable(GL_LIGHT0);//es una luz configurable (posición, color, tipo)
-    //que ilumina la escena.    GL_LIGHTING depende de este
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_LIGHTING);
+    glEnable(GL_LIGHT0);
     glEnable(GL_LIGHT1);
+
     // Configurar luz
     GLfloat luzAmbiente[] = {0.2f, 0.2f, 0.2f, 1.0f};
-    /*Configura la luz ambiental. que ilumina todos los objetos
-    sin tomar en cuenta la dirección de la luz.
-    Los valores especifican la intensidad de la luz en
-    los canales rojo, verde y azul.*/
     GLfloat luzDifusa[] = {0.8f, 0.8f, 0.8f, 1.0f};
-    /*configura La luz difusa es la luz que incide directamente
-     sobre los objetos y depende de su orientación.
-     tiene una intensidad del 80% para los tres canales (rojo, verde y azul).*/
     GLfloat posicionLuz[] = {0.0f, 10.0f, 10.0f, 1.0f};
-    /*Define la posición de la luz GL_LIGHT0. El último valor 1.0f indica que la
-    luz es una luz puntual, lo que significa que se emite desde un punto específico
-     las coordenadas =[0.0f, 10.0f, 10.0f].*/
     GLfloat luzDireccional[] = {0.5f, 0.5f, 0.5f, 1.0f};
-    GLfloat direccionLuz[] = {-1.0f, -1.0f, -1.0f, 0.0f}; // Luz que viene desde una dirección
-    //estas configuraciones de luz se aplican a la luz GL_LIGHT0
+    GLfloat direccionLuz[] = {-1.0f, -1.0f, -1.0f, 0.0f};
+
     glLightfv(GL_LIGHT0, GL_AMBIENT, luzAmbiente);
     glLightfv(GL_LIGHT0, GL_DIFFUSE, luzDifusa);
     glLightfv(GL_LIGHT0, GL_POSITION, posicionLuz);
-// Aplicar configuraciones a GL_LIGHT1 (luz direccional)
     glLightfv(GL_LIGHT1, GL_AMBIENT, luzDireccional);
     glLightfv(GL_LIGHT1, GL_POSITION, direccionLuz);
-    glLightfv(GL_LIGHT1, GL_DIFFUSE, luzDifusa); // Definir luz difusa para luz direccional
+    glLightfv(GL_LIGHT1, GL_DIFFUSE, luzDifusa);
 
-    /*Esto indica que GL_LIGHT0 está en una posición específica y
-    actuará como una luz puntual (el 1.0f al final lo indica).*/
     glClearColor(0.0f, 0.0f, 0.2f, 1.0f);
 
     // Inicializar asteroides
-    srand(time(NULL)); //srand srand es asegurarse de que la función rand (que genera números aleatorios)
-    //no sean siempre los mismos cada vez que se ejecuta el programa
+    srand(time(NULL));
     for(int i = 0; i < 5; i++) {
         crearAsteroide();
     }
 }
 
-// Función para dibujar la nave
+// FunciÃ³n para dibujar la nave
 void dibujarNave()
 {
     glPushMatrix();
-    /*guardamos el estado actual de la matriz de transformación. Esto es útil
-    porque nos permite realizar transformaciones locales (como traslaciones,
-    rotaciones, etc.) sin que estas afecten a otros objetos que puedan ser dibujados
-    posteriormente.*/
     glTranslatef(naveX, naveY, naveZ);
 
     // Material de la nave
     GLfloat materialNave[] = {0.0f, 0.5f, 1.0f, 1.0f};
-    GLfloat materialNaveEspecular[] = {1.0f, 1.0f, 1.0f, 1.0f};  // Color especular
-    GLfloat materialBrillo[] = {50.0f}; // Controla el brillo de los reflejos
-    //define el color de la nave
+    GLfloat materialNaveEspecular[] = {1.0f, 1.0f, 1.0f, 1.0f};
+    GLfloat materialBrillo[] = {50.0f};
+
     glMaterialfv(GL_FRONT, GL_DIFFUSE, materialNave);
-    //lo aplica a la nave, el GL_DIFFUSE indica el color de reflexión difuso en a nave
     glMaterialfv(GL_FRONT, GL_SPECULAR, materialNaveEspecular);
     glMaterialfv(GL_FRONT, GL_SHININESS, materialBrillo);
+
     // Cuerpo principal (cono)
     glPushMatrix();
     glRotatef(-90, 1, 0, 0);
@@ -179,13 +325,13 @@ void dibujarNave()
     glPopMatrix();
 }
 
-// Función para dibujar asteroides
+// FunciÃ³n para dibujar asteroides
 void dibujarAsteroides()
 {
     GLfloat materialAsteroide[] = {0.7f, 0.4f, 0.2f, 1.0f};
     glMaterialfv(GL_FRONT, GL_DIFFUSE, materialAsteroide);
 
-    for(int i = 0; i < asteroides.size(); i++) {
+    for(size_t i = 0; i < asteroides.size(); i++) {
         if(asteroides[i].activo) {
             glPushMatrix();
             glTranslatef(asteroides[i].x, asteroides[i].y, asteroides[i].z);
@@ -195,13 +341,13 @@ void dibujarAsteroides()
     }
 }
 
-// Función para dibujar proyectiles
+// FunciÃ³n para dibujar proyectiles
 void dibujarProyectiles()
 {
     GLfloat materialProyectil[] = {1.0f, 1.0f, 0.0f, 1.0f};
     glMaterialfv(GL_FRONT, GL_DIFFUSE, materialProyectil);
 
-    for(int i = 0; i < proyectiles.size(); i++) {
+    for(size_t i = 0; i < proyectiles.size(); i++) {
         if(proyectiles[i].activo) {
             glPushMatrix();
             glTranslatef(proyectiles[i].x, proyectiles[i].y, proyectiles[i].z);
@@ -211,7 +357,7 @@ void dibujarProyectiles()
     }
 }
 
-// Función para detectar colisiones
+// FunciÃ³n para detectar colisiones
 bool detectarColision(float x1, float y1, float z1, float r1,
                       float x2, float y2, float z2, float r2)
 {
@@ -222,47 +368,67 @@ bool detectarColision(float x1, float y1, float z1, float r1,
     return distancia < (r1 + r2);
 }
 
-// Función para actualizar el juego
+// FunciÃ³n para reiniciar el juego
+void reiniciarJuego() {
+    juegoTerminado = false;
+    vidas = 3;
+    puntuacion = 0;
+    naveX = naveY = naveZ = 0.0f;
+    asteroides.clear();
+    proyectiles.clear();
+    particulas.clear();
+
+    for(int i = 0; i < 5; i++) {
+        crearAsteroide();
+    }
+
+    std::cout << "Â¡Juego reiniciado!" << std::endl;
+}
+
+// FunciÃ³n para actualizar el juego
 void actualizar()
 {
+    if(juegoTerminado) {
+        return; // No actualizar si el juego ha terminado
+    }
+
     // Mover asteroides
-    for(int i = 0; i < asteroides.size(); i++) {
+    for(size_t i = 0; i < asteroides.size(); i++) {
         if(asteroides[i].activo) {
             asteroides[i].x += asteroides[i].vx;
             asteroides[i].y += asteroides[i].vy;
             asteroides[i].z += asteroides[i].vz;
 
-            // Eliminar asteroide si está muy lejos o muy cerca
+            // Eliminar asteroide si estÃ¡ muy lejos o muy cerca
             float distanciaNave = sqrt(pow(asteroides[i].x - naveX, 2) +
                                        pow(asteroides[i].y - naveY, 2) +
                                        pow(asteroides[i].z - naveZ, 2));
 
             if(distanciaNave > 30 || asteroides[i].z > 10) {
                 asteroides.erase(asteroides.begin() + i);
-                i--; // Ajustar índice después de eliminar
+                i--; // Ajustar Ã­ndice despuÃ©s de eliminar
                 continue;
             }
 
-            // Colisión con la nave
+            // ColisiÃ³n con la nave
             if(detectarColision(asteroides[i].x, asteroides[i].y, asteroides[i].z, asteroides[i].radio,
                                 naveX, naveY, naveZ, 0.7f)) {
                 vidas--;
+                crearExplosion(asteroides[i].x, asteroides[i].y, asteroides[i].z);
                 asteroides.erase(asteroides.begin() + i);
-                i--; // Ajustar índice
-                std::cout << "¡Impacto! Vidas restantes: " << vidas << std::endl;
+                i--; // Ajustar Ã­ndice
+                std::cout << "Â¡Impacto! Vidas restantes: " << vidas << std::endl;
 
-                // Si las vidas llegan a 0, explotar y terminar el juego
                 if(vidas <= 0) {
-                    crearExplosion(naveX, naveY, naveZ);  // Explosión de la nave
-                    std::cout << "¡Juego Terminado! Puntuación final: " << puntuacion << std::endl;
-                    exit(0);  // Termina el juego
+                    juegoTerminado = true;
+                    crearExplosion(naveX, naveY, naveZ); // ExplosiÃ³n de la nave
+                    std::cout << "Â¡GAME OVER! PuntuaciÃ³n final: " << puntuacion << std::endl;
                 }
             }
-
         }
     }
 
-    // Crear nuevos asteroides periódicamente
+    // Crear nuevos asteroides periÃ³dicamente
     static int contadorAsteroides = 0;
     contadorAsteroides++;
     if(contadorAsteroides > 120 && asteroides.size() < 8) { // Cada 2 segundos aprox
@@ -271,7 +437,7 @@ void actualizar()
     }
 
     // Mover proyectiles
-    for(int i = 0; i < proyectiles.size(); i++) {
+    for(size_t i = 0; i < proyectiles.size(); i++) {
         if(proyectiles[i].activo) {
             proyectiles[i].z += proyectiles[i].vz;
 
@@ -280,8 +446,8 @@ void actualizar()
                 proyectiles[i].activo = false;
             }
 
-            // Colisión con asteroides
-            for(int j = 0; j < asteroides.size(); j++) {
+            // ColisiÃ³n con asteroides
+            for(size_t j = 0; j < asteroides.size(); j++) {
                 if(asteroides[j].activo &&
                         detectarColision(proyectiles[i].x, proyectiles[i].y, proyectiles[i].z, 0.2f,
                                          asteroides[j].x, asteroides[j].y, asteroides[j].z, asteroides[j].radio)) {
@@ -289,7 +455,7 @@ void actualizar()
                     crearExplosion(asteroides[j].x, asteroides[j].y, asteroides[j].z);
                     asteroides.erase(asteroides.begin() + j);
                     puntuacion += 10;
-                    std::cout << "¡Asteroide destruido! Puntuación: " << puntuacion << std::endl;
+                    std::cout << "Â¡Asteroide destruido! PuntuaciÃ³n: " << puntuacion << std::endl;
                     break;
                 }
             }
@@ -302,34 +468,53 @@ void actualizar()
             proyectiles.erase(proyectiles.begin() + i);
         }
     }
+
+    // Limpiar partÃ­culas muertas
+    for(int i = particulas.size() - 1; i >= 0; i--) {
+        if(particulas[i].vida <= 0) {
+            particulas.erase(particulas.begin() + i);
+        }
+    }
 }
 
-// Función de renderizado
+// FunciÃ³n de renderizado
 void display()
 {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // Configurar cámara - posición más fija para ver el movimiento de la nave
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
+    if(!juegoTerminado) {
+        // Configurar cÃ¡mara - posiciÃ³n mÃ¡s fija para ver el movimiento de la nave
+        glMatrixMode(GL_MODELVIEW);
+        glLoadIdentity();
 
-    // Cámara que sigue a la nave pero con un offset fijo
-    float camX = sin(cameraAngulo) * cameraDistancia;
-    float camZ = cos(cameraAngulo) * cameraDistancia + 5.0f; // Posición más fija
+        // CÃ¡mara que sigue a la nave pero con un offset fijo
+        float camX = sin(cameraAngulo) * cameraDistancia;
+        float camZ = cos(cameraAngulo) * cameraDistancia + 5.0f; // PosiciÃ³n mÃ¡s fija
 
-    gluLookAt(camX, cameraAltura, camZ,
-              naveX, naveY, naveZ,  // Mira hacia la nave
-              0.0f, 1.0f, 0.0f);
+        gluLookAt(camX, cameraAltura, camZ,
+                  naveX, naveY, naveZ,  // Mira hacia la nave
+                  0.0f, 1.0f, 0.0f);
 
-    // Dibujar elementos del juego
-    dibujarNave();
-    dibujarAsteroides();
-    dibujarProyectiles();
-    dibujarParticulas();  // Llamada para dibujar las partículas
+        // Dibujar elementos del juego
+        dibujarNave();
+        dibujarAsteroides();
+        dibujarProyectiles();
+    }
+
+    dibujarParticulas();  // Dibujar partÃ­culas siempre
+
+    // Dibujar UI
+    dibujarUI();
+
+    // Dibujar pantalla de Game Over si es necesario
+    if(juegoTerminado) {
+        dibujarGameOver();
+    }
+
     glutSwapBuffers();
 }
 
-// Función de redimensionado
+// FunciÃ³n de redimensionado
 void reshape(int w, int h)
 {
     glViewport(0, 0, w, h);
@@ -338,114 +523,106 @@ void reshape(int w, int h)
     gluPerspective(45.0, (double)w / (double)h, 1.0, 100.0);
 }
 
-// Función de teclado
+// FunciÃ³n de teclado
 void keyboard(unsigned char key, int x, int y)
 {
     switch(key) {
     case 27: // ESC
         exit(0);
         break;
-    case ' ': { // Espacio para disparar
-        Proyectil nuevoProyectil;
-        nuevoProyectil.x = naveX;
-        nuevoProyectil.y = naveY;
-        nuevoProyectil.z = naveZ - 1.0f;
-        nuevoProyectil.vx = 0.0f;
-        nuevoProyectil.vy = 0.0f;
-        nuevoProyectil.vz = -0.8f; // Más rápido
-        nuevoProyectil.activo = true;
-        proyectiles.push_back(nuevoProyectil);
-    }
-    break;
-    case 'r': // Reiniciar juego
-    case 'R':
-        vidas = 3;
-        puntuacion = 0;
-        naveX = naveY = naveZ = 0.0f;
-        asteroides.clear();
-        proyectiles.clear();
-        for(int i = 0; i < 3; i++) {
-            crearAsteroide();
+    case ' ': // Espacio para disparar
+        if(!juegoTerminado) {
+            Proyectil nuevoProyectil;
+            nuevoProyectil.x = naveX;
+            nuevoProyectil.y = naveY;
+            nuevoProyectil.z = naveZ - 1.0f;
+            nuevoProyectil.vx = 0.0f;
+            nuevoProyectil.vy = 0.0f;
+            nuevoProyectil.vz = -0.8f; // MÃ¡s rÃ¡pido
+            nuevoProyectil.activo = true;
+            proyectiles.push_back(nuevoProyectil);
         }
         break;
-    // Controles WASD
+    case 'r': // Reiniciar juego
+    case 'R':
+        reiniciarJuego();
+        break;
+    // Controles WASD - solo si el juego no ha terminado
     case 'w':
     case 'W':
-        naveY += 0.5f;
-        std::cout << "WASD W - Posición: (" << naveX << ", " << naveY << ")" << std::endl;
+        if(!juegoTerminado) {
+            naveY += 0.5f;
+            std::cout << "WASD W - PosiciÃ³n: (" << naveX << ", " << naveY << ")" << std::endl;
+        }
         break;
     case 's':
     case 'S':
-        naveY -= 0.5f;
-        std::cout << "WASD S - Posición: (" << naveX << ", " << naveY << ")" << std::endl;
+        if(!juegoTerminado) {
+            naveY -= 0.5f;
+            std::cout << "WASD S - PosiciÃ³n: (" << naveX << ", " << naveY << ")" << std::endl;
+        }
         break;
     case 'a':
     case 'A':
-        naveX -= 0.5f;
-        std::cout << "WASD A - Posición: (" << naveX << ", " << naveY << ")" << std::endl;
+        if(!juegoTerminado) {
+            naveX -= 0.5f;
+            std::cout << "WASD A - PosiciÃ³n: (" << naveX << ", " << naveY << ")" << std::endl;
+        }
         break;
     case 'd':
     case 'D':
-        naveX += 0.5f;
-        std::cout << "WASD D - Posición: (" << naveX << ", " << naveY << ")" << std::endl;
+        if(!juegoTerminado) {
+            naveX += 0.5f;
+            std::cout << "WASD D - PosiciÃ³n: (" << naveX << ", " << naveY << ")" << std::endl;
+        }
         break;
     }
 
-    // Limitar movimiento de la nave
-    if(naveX > 8) {
-        naveX = 8;
-    }
-    if(naveX < -8) {
-        naveX = -8;
-    }
-    if(naveY > 6) {
-        naveY = 6;
-    }
-    if(naveY < -6) {
-        naveY = -6;
+    // Limitar movimiento de la nave solo si el juego no ha terminado
+    if(!juegoTerminado) {
+        if(naveX > 8) naveX = 8;
+        if(naveX < -8) naveX = -8;
+        if(naveY > 6) naveY = 6;
+        if(naveY < -6) naveY = -6;
     }
 }
 
-// Función de teclas especiales (flechas)
+// FunciÃ³n de teclas especiales (flechas)
 void specialKeys(int key, int x, int y)
 {
+    if(juegoTerminado) return; // No procesar teclas especiales si el juego terminÃ³
+
     switch(key) {
     case GLUT_KEY_LEFT:
         naveX -= 0.5f;
-        std::cout << "Nave izquierda - Posición: (" << naveX << ", " << naveY << ")" << std::endl;
+        std::cout << "Nave izquierda - PosiciÃ³n: (" << naveX << ", " << naveY << ")" << std::endl;
         break;
     case GLUT_KEY_RIGHT:
         naveX += 0.5f;
-        std::cout << "Nave derecha - Posición: (" << naveX << ", " << naveY << ")" << std::endl;
+        std::cout << "Nave derecha - PosiciÃ³n: (" << naveX << ", " << naveY << ")" << std::endl;
         break;
     case GLUT_KEY_UP:
         naveY += 0.5f;
-        std::cout << "Nave arriba - Posición: (" << naveX << ", " << naveY << ")" << std::endl;
+        std::cout << "Nave arriba - PosiciÃ³n: (" << naveX << ", " << naveY << ")" << std::endl;
         break;
     case GLUT_KEY_DOWN:
         naveY -= 0.5f;
-        std::cout << "Nave abajo - Posición: (" << naveX << ", " << naveY << ")" << std::endl;
+        std::cout << "Nave abajo - PosiciÃ³n: (" << naveX << ", " << naveY << ")" << std::endl;
         break;
     }
 
     // Limitar movimiento de la nave
-    if(naveX > 8) {
-        naveX = 8;
-    }
-    if(naveX < -8) {
-        naveX = -8;
-    }
-    if(naveY > 6) {
-        naveY = 6;
-    }
-    if(naveY < -6) {
-        naveY = -6;
-    }
+    if(naveX > 8) naveX = 8;
+    if(naveX < -8) naveX = -8;
+    if(naveY > 6) naveY = 6;
+    if(naveY < -6) naveY = -6;
 }
 
-// Función de mouse para controlar la cámara
+// FunciÃ³n de mouse para controlar la cÃ¡mara
 void mouse(int button, int state, int x, int y)
 {
+    if(juegoTerminado) return; // No procesar mouse si el juego terminÃ³
+
     if(button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
         cameraAngulo += 0.2f;
     }
@@ -454,23 +631,25 @@ void mouse(int button, int state, int x, int y)
     }
 }
 
-// Función de animación
+// FunciÃ³n de animaciÃ³n
 void timer(int value)
 {
     actualizar();
 
-    // Mostrar información cada cierto tiempo
-    static int contador = 0;
-    if(contador % 60 == 0) {
-        std::cout << "Vidas: " << vidas << " | Puntuacion: " << puntuacion << std::endl;
+    // Mostrar informaciÃ³n cada cierto tiempo (solo si el juego no ha terminado)
+    if(!juegoTerminado) {
+        static int contador = 0;
+        if(contador % 60 == 0) {
+            std::cout << "Vidas: " << vidas << " | PuntuaciÃ³n: " << puntuacion << std::endl;
+        }
+        contador++;
     }
-    contador++;
 
     glutPostRedisplay();
     glutTimerFunc(16, timer, 0); // ~60 FPS
 }
 
-// Función principal
+// FunciÃ³n principal
 int main(int argc, char** argv)
 {
     std::cout << "=== NAVE VS ASTEROIDES 3D ===" << std::endl;
@@ -478,16 +657,16 @@ int main(int argc, char** argv)
     std::cout << "- WASD: Mover nave" << std::endl;
     std::cout << "- Flechas: Mover nave (alternativo)" << std::endl;
     std::cout << "- Espacio: Disparar" << std::endl;
-    std::cout << "- Click izq/der: Rotar cámara" << std::endl;
+    std::cout << "- Click izq/der: Rotar cÃ¡mara" << std::endl;
     std::cout << "- R: Reiniciar juego" << std::endl;
     std::cout << "- ESC: Salir" << std::endl;
-    std::cout << "¡Esquiva los asteroides y disparales!" << std::endl;
+    std::cout << "Â¡Esquiva los asteroides y dispÃ¡rales!" << std::endl;
     std::cout << "==============================" << std::endl;
 
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
     glutInitWindowSize(800, 600);
-    glutCreateWindow("Nave vs. Asteroides 3D");
+    glutCreateWindow("Nave vs Asteroides 3D - Mejorado");
 
     inicializar();
 
