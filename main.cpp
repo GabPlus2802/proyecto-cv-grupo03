@@ -78,7 +78,7 @@ void corazon(float x,float y){
     glOrtho(0,glutGet(GLUT_WINDOW_WIDTH),0,glutGet(GLUT_WINDOW_HEIGHT),-1,1);
     glMatrixMode(GL_MODELVIEW);  glPushMatrix(); glLoadIdentity();
     glDisable(GL_LIGHTING); glDisable(GL_DEPTH_TEST);
-    glColor3f(1,0,0); glTranslatef(x,y,0); glScalef(3,3,1);
+    glColor3f(1,0,0); glTranslatef(x+10,y+10,0); glScalef(1,1,1);
     glBegin(GL_TRIANGLE_FAN); glVertex2f(0,0);
         for(int i=0;i<=180;i+=10){ float r=i*3.14159f/180.f;
             glVertex2f(5*cos(r)-5,5*sin(r)+5);}
