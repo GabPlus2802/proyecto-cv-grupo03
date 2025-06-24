@@ -530,14 +530,15 @@ void timer(int)
 
 int main(int argc, char** argv)
 {
-    std::cout << "=== NAVE VS ASTEROIDES 3D ===" << std::endl;
-    std::cout << "Controles:" << std::endl;
-    std::cout << "- WASD / Flechas: Mover nave" << std::endl;
-    std::cout << "- Espacio / Click derecho: Disparar" << std::endl;
-    std::cout << "- Click izquierdo: Rotar camara" << std::endl;
-    std::cout << "- R: Reiniciar juego" << std::endl;
-    std::cout << "- ESC: Salir" << std::endl;
-    std::cout << "¡Esquiva los asteroides y destruyelos!" << std::endl;
+    std::cout << "\n ====== NAVE VS ASTEROIDES 3D ======" << std::endl;
+    std::cout << "\n Controles:\n" << std::endl;
+    std::cout << " - WASD / Flechas: Mover nave" << std::endl;
+    std::cout << " - Espacio / Click derecho: Disparar" << std::endl;
+    std::cout << " - Click izquierdo: Rotar camara" << std::endl;
+    std::cout << " - +/-: Zoom" << std::endl;
+    std::cout << " - R: Reiniciar juego" << std::endl;
+    std::cout << " - ESC: Salir" << std::endl;
+    std::cout << "\n Esquiva los asteroides y destruyelos!" << std::endl;
 
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
