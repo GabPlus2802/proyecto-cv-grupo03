@@ -8,11 +8,20 @@
 #include <cmath>
 #include <ctime>
 #include <sstream>
-
+#define GLFW_DLL
+#include <GLFW/glfw3.h>
 /*=======================  ESTRUCTURAS  =======================*/
-struct Asteroide { float x,y,z, vx,vy,vz, radio; bool activo; };
-struct Proyectil { float x,y,z, vx,vy,vz; bool activo; };
-struct Particula { float x,y,z, vx,vy,vz, vida; };
+struct Asteroide {
+    float x,y,z, vx,vy,vz, radio;
+    bool activo;
+};
+struct Proyectil {
+    float x,y,z, vx,vy,vz;
+    bool activo;
+};
+struct Particula {
+    float x,y,z, vx,vy,vz, vida;
+};
 
 /*=======================  ESTADO  ============================*/
 float naveX = 0.0f, naveY = 0.0f, naveZ = 0.0f;
@@ -22,7 +31,7 @@ std::vector<Particula> parts;
 int score = 0, lives = 3;
 bool gameOver = false;
 bool gameStarted = false;
-
+bool isNaveVisible = true; // Variable que indica si la nave es visible o no
 /*=======================  CAMARA  ============================*/
 float camDist   = 15.0f;                 // distancia actual
 float camYaw    = 0.0f;                  // giro horizontal (°)
@@ -33,17 +42,19 @@ const float camPitchMax =  89.0f;
 const float camPitchMin = -89.0f;
 const float camDistMin  =   5.0f;
 const float camDistMax  =  40.0f;
-
 /* Raton */
 bool mouseDown = false;
 int  lastX=0, lastY=0;
 
+int explosionTimer = 0;  // Temporizador para esperar después de la explosión
+bool explosionEnProceso = false;
 /*=======================  UTIL  ==============================*/
-std::string toStr(int n)
+std::string toStr(int n)/*convierte un valor entero en una cadena
+de caracteres (std::string)*/
 {
     std::stringstream ss;
-    ss << n;
-    return ss.str();
+    ss << n;//n se inserta en ss
+    return ss.str();//se convierte los ss a un string
 }
 
 /*=======================  PROTOS  ============================*/
@@ -79,9 +90,9 @@ void texto(float x, float y, const std::string& s, void* f=GLUT_BITMAP_HELVETICA
     glLoadIdentity();
     glDisable(GL_LIGHTING);
     glDisable(GL_DEPTH_TEST);
-    glRasterPos2f(x, y);
+    glRasterPos2f(x, y);//establece la posición donde se dibujara el texto
     for(char c: s) {
-        glutBitmapCharacter(f, c);
+        glutBitmapCharacter(f, c);//cada caracter de s se va renderizar en base a la fuente de f
     }
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_LIGHTING);
@@ -93,18 +104,19 @@ void texto(float x, float y, const std::string& s, void* f=GLUT_BITMAP_HELVETICA
 
 void corazon(float x,float y)
 {
-    glMatrixMode(GL_PROJECTION);
+    glMatrixMode(GL_PROJECTION); //se establece una proyeccion
     glPushMatrix();
     glLoadIdentity();
-    glOrtho(0,glutGet(GLUT_WINDOW_WIDTH),0,glutGet(GLUT_WINDOW_HEIGHT),-1,1);
-    glMatrixMode(GL_MODELVIEW);
+    glOrtho(0,glutGet(GLUT_WINDOW_WIDTH),0,glutGet(GLUT_WINDOW_HEIGHT),-1,1);//se establece una proye orto 2d
+    glMatrixMode(GL_MODELVIEW);//se establece la visualización
     glPushMatrix();
     glLoadIdentity();
     glDisable(GL_LIGHTING);
-    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_DEPTH_TEST);//se desactivan estos efectos para no afectar el dibujo
     glColor3f(1,0,0);
     glTranslatef(x+10,y+10,0);
     glScalef(1,1,1);
+    //Primera mitad superior del corazón (lado izquierdo)
     glBegin(GL_TRIANGLE_FAN);
     glVertex2f(0,0);
     for(int i=0; i<=180; i+=10) {
@@ -112,6 +124,7 @@ void corazon(float x,float y)
         glVertex2f(5*cos(r)-5,5*sin(r)+5);
     }
     glEnd();
+    //Segunda mitad superior del corazón (lado izquierdo)
     glBegin(GL_TRIANGLE_FAN);
     glVertex2f(0,0);
     for(int i=0; i<=180; i+=10) {
@@ -119,6 +132,7 @@ void corazon(float x,float y)
         glVertex2f(5*cos(r)+5,5*sin(r)+5);
     }
     glEnd();
+    //se dibuja la parte inferior del corazon
     glBegin(GL_TRIANGLES);
     glVertex2f(-10,5);
     glVertex2f( 10,5);
@@ -139,12 +153,13 @@ void initGL()
     glEnable(GL_LIGHTING);
     glEnable(GL_LIGHT0);
     GLfloat amb[] = {.2f, .2f, .2f, 1}, dif[] = {.8f, .8f, .8f, 1}, pos[] = {0, 10, 10, 1};
+    //se configura las propiedades de la luz
     glLightfv(GL_LIGHT0, GL_AMBIENT, amb);
     glLightfv(GL_LIGHT0, GL_DIFFUSE, dif);
     glLightfv(GL_LIGHT0, GL_POSITION, pos);
     glClearColor(0, 0, 0.2f, 1);
 
-    srand(time(nullptr));
+    srand(time(nullptr));//Inicializa la generación de objetos usando el tiempo actual
     for(int i = 0; i < 5; ++i) {
         crearAsteroide();
     }
@@ -181,11 +196,11 @@ void dibujarAsteroides()
     GLfloat col[]= {0.7f,0.4f,0.2f,1};
     glMaterialfv(GL_FRONT,GL_DIFFUSE,col);
     for(auto &a:asts) if(a.activo) {
-        glPushMatrix();
-        glTranslatef(a.x,a.y,a.z);
-        glutSolidSphere(a.radio,8,8);
-        glPopMatrix();
-    }
+            glPushMatrix();
+            glTranslatef(a.x,a.y,a.z);
+            glutSolidSphere(a.radio,8,8);
+            glPopMatrix();
+        }
 }
 
 void dibujarProyectiles()
@@ -193,11 +208,11 @@ void dibujarProyectiles()
     GLfloat col[]= {1,1,0,1};
     glMaterialfv(GL_FRONT,GL_DIFFUSE,col);
     for(auto &p:pros) if(p.activo) {
-        glPushMatrix();
-        glTranslatef(p.x,p.y,p.z);
-        glutSolidSphere(0.1,6,6);
-        glPopMatrix();
-    }
+            glPushMatrix();
+            glTranslatef(p.x,p.y,p.z);
+            glutSolidSphere(0.1,6,6);
+            glPopMatrix();
+        }
 }
 
 void dibujarParticulas()
@@ -263,23 +278,50 @@ void actualizar()
         }
         if(colision(a.x,a.y,a.z,a.radio,naveX,naveY,naveZ,0.7f)) {
             lives--;
-            crearExplosion(a.x,a.y,a.z);
-            asts.erase(asts.begin()+i);
-            if(lives<=0) {
-                gameOver=true;
+            if(lives>0) {
+                crearExplosion(a.x,a.y,a.z);
+                asts.erase(asts.begin()+i);
+            } else {
                 crearExplosion(naveX,naveY,naveZ);
+                explosionEnProceso = true;  // Marcar que la explosión está en proceso
+                explosionTimer = 40;
+                isNaveVisible = false;
+                asts.erase(asts.begin()+i);
             }
             continue;
         }
         ++i;
+        if (explosionEnProceso) {
+            explosionTimer--;  // Decrementar el temporizador de espera
+            // Después de la espera, activar el estado de gameOver
+            if (explosionTimer <= 0) {
+                gameOver = true;
+                explosionEnProceso = false;
+            }
+        }
     }
     static int spawn=0;
-    if(++spawn>120&&asts.size()<8) {
-        crearAsteroide();
-        spawn=0;
+    /*usa para controlar el tiempo entre las generaciones de asteroides.
+    su valor se mantiene entre llamadas a la función. Al ser estática, su valor
+    no se reinicia a 0 cada vez que la función es llamada*/
+    int spawnRate = 120;  // Frecuencia de generación de asteroides por defecto
+    int total=8; // total de asteroides
+    // Si el puntaje es mayor a 100, aumentar la frecuencia de creación de asteroides
+    if (score > 100) {
+        spawnRate = 80;  // Generar más rápido si el puntaje supera 100
+        total=9;
+    }
+    if (score > 300) {
+        spawnRate = 50;  // Generar más rápido si el puntaje supera 100
+        total=10;
     }
 
-    // Proyectiles
+    if (++spawn > spawnRate && asts.size() < total) {
+        crearAsteroide();
+        spawn = 0;
+    }
+
+// Proyectiles
     for(size_t i=0; i<pros.size();) {
         auto &p=pros[i];
         p.z+=p.vz;
@@ -289,7 +331,7 @@ void actualizar()
         }
         bool borrado=false;
         for(size_t j=0; j<asts.size(); ++j) if(asts[j].activo &&
-                                               colision(p.x,p.y,p.z,0.2f,asts[j].x,asts[j].y,asts[j].z,asts[j].radio)) {
+                                                   colision(p.x,p.y,p.z,0.2f,asts[j].x,asts[j].y,asts[j].z,asts[j].radio)) {
                 crearExplosion(asts[j].x,asts[j].y,asts[j].z);
                 asts.erase(asts.begin()+j);
                 borrado=true;
@@ -303,7 +345,7 @@ void actualizar()
         ++i;
     }
 
-    // Particulas
+// Particulas
     for(size_t i=0; i<parts.size();) {
         auto &p=parts[i];
         p.x+=p.vx;
@@ -316,26 +358,26 @@ void actualizar()
         }
         ++i;
     }
+
 }
 
 /*=======================  DISPLAY  ===========================*/
-void display()
+void display() //función que se va encargar de renderizar nuestro programa
 {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
-
     if (!gameStarted) {
         dibujarPantallaInicio();
     } else {
         // Camara orbital
-        float yawR = camYaw * 3.14159f / 180.f, pitR = camPitch * 3.14159f / 180.f;
+        float yawR = camYaw * 3.14159f / 180.f, pitR = camPitch * 3.14159f / 180.f;//para rotar la camara
         float cx = camDist * cos(pitR) * sin(yawR);
         float cy = camDist * sin(pitR);
         float cz = camDist * cos(pitR) * cos(yawR);
         gluLookAt(cx + naveX, cy + naveY + 2, cz + naveZ, naveX, naveY, naveZ, 0, 1, 0);
-
-        dibujarNave();
+        //configura la posición de la cámara y la dirección hacia la que debe mirar.
+        //dibujarNave();
         dibujarAsteroides();
         dibujarProyectiles();
         dibujarParticulas();
@@ -346,9 +388,11 @@ void display()
         for(int i = 0; i < lives; ++i) {
             corazon(70 + i * 30, glutGet(GLUT_WINDOW_HEIGHT) - 55);
         }
-
+        if (isNaveVisible) {
+            dibujarNave();
+        }
         if (gameOver) {
-            texto(glutGet(GLUT_WINDOW_WIDTH) / 2 - 50, glutGet(GLUT_WINDOW_HEIGHT) / 2, "GAME OVER", GLUT_BITMAP_TIMES_ROMAN_24);
+            texto(glutGet(GLUT_WINDOW_WIDTH) / 2 - 80, glutGet(GLUT_WINDOW_HEIGHT) / 2, "GAME OVER", GLUT_BITMAP_TIMES_ROMAN_24);
             texto(glutGet(GLUT_WINDOW_WIDTH) / 2 - 80, glutGet(GLUT_WINDOW_HEIGHT) / 2 - 30, "Press R to restart");
         }
     }
@@ -423,7 +467,8 @@ void keyboard(unsigned char k, int x, int y)
 
     if (!gameStarted) {
         if (k == 13) {  // Enter key
-            gameStarted = true;  // Comienza el juego
+            gameStarted = true;
+            gameOver=false; // Comienza el juego
         }
         return;  // Si el juego no ha comenzado, no hacer nada más
     }
@@ -436,6 +481,9 @@ void keyboard(unsigned char k, int x, int y)
         parts.clear();
         gameOver = false;
         gameStarted = false;  // Volver a la pantalla de inicio
+        explosionEnProceso = false;  // Asegurarse de que no haya una explosión activa
+        explosionTimer = 0;  // Resetear temporizador de la explosión
+        isNaveVisible = true;  // Asegurarse de que la nave sea visible
     }
 
     if (k == ' ' && !gameOver) {  // Disparar
@@ -519,10 +567,10 @@ void special(int k,int,int)
     }
 }
 
-void timer(int)
+void timer(int)//manejar el tiempo de actualización de la escena
 {
     actualizar();
-    glutPostRedisplay();
+    glutPostRedisplay();// Solicita a GLUT que actualice correctamente
     glutTimerFunc(16,timer,0);   // ~60 FPS
 }
 
