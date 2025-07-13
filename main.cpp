@@ -42,6 +42,7 @@ int score = 0, lives = 3;
 bool gameOver = false;
 bool gameStarted = false;
 bool isNaveVisible = true; // Variable que indica si la nave es visible o no
+int lastLifeBonus = 0;  // Último puntaje múltiplo de 200 donde se otorgó vida
 
 //=======================  CAMARA  ============================//
 float camDist   = 15.0f;                 // distancia actual
@@ -71,10 +72,11 @@ std::string toStr(int n)
 //=======================  PROTOS  ============================//
 void initGL();
 void crearAsteroide();
-void crearExplosion(float,float,float);
+void crearExplosion(float, float, float);
+void crearExplosionVidaExtra(float, float, float);
 void crearEstrellas();
 void dibujarFondo();
-void dibujarAsteroideDetallado(float radio, int tipo);
+void dibujarAsteroideDetallado(float, int);
 void dibujarNaveDetallada();
 void actualizar();
 void display();
@@ -567,6 +569,21 @@ void crearExplosion(float x, float y, float z)
     }
 }
 
+void crearExplosionVidaExtra(float x, float y, float z)
+{
+    for (int i = 0; i < 60; ++i) {
+        Particula p;
+        p.x = x;
+        p.y = y;
+        p.z = z;
+        p.vx = ((rand() % 100) / 50.0f) - 1.0f;
+        p.vy = ((rand() % 100) / 50.0f) - 1.0f;
+        p.vz = ((rand() % 100) / 50.0f) - 1.0f;
+        p.vida = 1.5f; // Duración más larga
+        parts.push_back(p);
+    }
+}
+
 //=======================  ACTUALIZAR MUNDO  ==================//
 void actualizar()
 {
@@ -666,6 +683,15 @@ void actualizar()
         }
         if(borrado) {
             pros.erase(pros.begin()+i);
+            // NUEVO: Sistema de vida extra
+            int currentMultiple = (score / 100) * 100;
+            if(currentMultiple > 0 && currentMultiple > lastLifeBonus && lives < 5) {
+              lives++;
+              lastLifeBonus = currentMultiple;
+
+              // Crear efecto visual especial para vida extra
+              crearExplosion(naveX, naveY, naveZ + 2); // Explosión verde más arriba
+            }
             continue;
         }
         ++i;
@@ -810,6 +836,7 @@ void keyboard(unsigned char k, int x, int y)
     if (k == 'r' || k == 'R') {  // Reiniciar juego
         score = 0;
         lives = 3;
+        lastLifeBonus = 0;  // NUEVO: Reiniciar contador de vida extra
         asts.clear();
         pros.clear();
         parts.clear();
