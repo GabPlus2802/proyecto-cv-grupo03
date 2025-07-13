@@ -1,6 +1,6 @@
 /*********************************************************************
 *   NAVE VS ASTEROIDES 3D + camara orbital + zoom + sensibilidad     *
-*   Compilar (ejemplo GCC):  g++ juego.cpp -lGL -lGLU -lglut         *
+*   Compilar (ejemplo GCC):  g++ -std=c++11 juego.cpp -lGL -lGLU -lglut         *
 *********************************************************************/
 #include <GL/glut.h>
 #include <iostream>
@@ -8,31 +8,42 @@
 #include <cmath>
 #include <ctime>
 #include <sstream>
-#define GLFW_DLL
-#include <GLFW/glfw3.h>
-/*=======================  ESTRUCTURAS  =======================*/
+
+//=======================  ESTRUCTURAS  =======================//
 struct Asteroide {
     float x,y,z, vx,vy,vz, radio;
+    float rotX, rotY, rotZ; // Rotación para cada asteroide
+    float velRotX, velRotY, velRotZ; // Velocidad de rotación
+    int tipo; // Tipo de asteroide (0, 1, 2)
     bool activo;
 };
+
 struct Proyectil {
     float x,y,z, vx,vy,vz;
     bool activo;
 };
+
 struct Particula {
     float x,y,z, vx,vy,vz, vida;
 };
 
-/*=======================  ESTADO  ============================*/
+struct Estrella {
+    float x, y, z;
+    float brillo;
+};
+
+//=======================  ESTADO  ============================//
 float naveX = 0.0f, naveY = 0.0f, naveZ = 0.0f;
 std::vector<Asteroide> asts;
 std::vector<Proyectil> pros;
 std::vector<Particula> parts;
+std::vector<Estrella> estrellas;
 int score = 0, lives = 3;
 bool gameOver = false;
 bool gameStarted = false;
 bool isNaveVisible = true; // Variable que indica si la nave es visible o no
-/*=======================  CAMARA  ============================*/
+
+//=======================  CAMARA  ============================//
 float camDist   = 15.0f;                 // distancia actual
 float camYaw    = 0.0f;                  // giro horizontal (°)
 float camPitch  = 5.0f;                  // giro vertical   (°)
@@ -48,19 +59,23 @@ int  lastX=0, lastY=0;
 
 int explosionTimer = 0;  // Temporizador para esperar después de la explosión
 bool explosionEnProceso = false;
-/*=======================  UTIL  ==============================*/
-std::string toStr(int n)/*convierte un valor entero en una cadena
-de caracteres (std::string)*/
+
+//=======================  UTIL  ==============================//
+std::string toStr(int n)
 {
     std::stringstream ss;
-    ss << n;//n se inserta en ss
-    return ss.str();//se convierte los ss a un string
+    ss << n;
+    return ss.str();
 }
 
-/*=======================  PROTOS  ============================*/
+//=======================  PROTOS  ============================//
 void initGL();
 void crearAsteroide();
 void crearExplosion(float,float,float);
+void crearEstrellas();
+void dibujarFondo();
+void dibujarAsteroideDetallado(float radio, int tipo);
+void dibujarNaveDetallada();
 void actualizar();
 void display();
 void reshape(int,int);
@@ -70,7 +85,7 @@ void mouse(int,int,int,int);
 void motion(int,int);
 void timer(int);
 
-/*=======================  LOGICA DE JUEGO  ===================*/
+//=======================  LOGICA DE JUEGO  ===================//
 bool colision(float x1,float y1,float z1,float r1,
               float x2,float y2,float z2,float r2)
 {
@@ -78,7 +93,7 @@ bool colision(float x1,float y1,float z1,float r1,
     return sqrt(dx*dx+dy*dy+dz*dz) < (r1+r2);
 }
 
-/*=======================  DIBUJO SIMPLE  =====================*/
+//=======================  DIBUJO SIMPLE  =====================//
 void texto(float x, float y, const std::string& s, void* f=GLUT_BITMAP_HELVETICA_18)
 {
     glMatrixMode(GL_PROJECTION);
@@ -90,9 +105,9 @@ void texto(float x, float y, const std::string& s, void* f=GLUT_BITMAP_HELVETICA
     glLoadIdentity();
     glDisable(GL_LIGHTING);
     glDisable(GL_DEPTH_TEST);
-    glRasterPos2f(x, y);//establece la posición donde se dibujara el texto
-    for(char c: s) {
-        glutBitmapCharacter(f, c);//cada caracter de s se va renderizar en base a la fuente de f
+    glRasterPos2f(x, y);
+    for(size_t i = 0; i < s.length(); ++i) {
+        glutBitmapCharacter(f, s[i]);
     }
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_LIGHTING);
@@ -104,15 +119,15 @@ void texto(float x, float y, const std::string& s, void* f=GLUT_BITMAP_HELVETICA
 
 void corazon(float x,float y)
 {
-    glMatrixMode(GL_PROJECTION); //se establece una proyeccion
+    glMatrixMode(GL_PROJECTION);
     glPushMatrix();
     glLoadIdentity();
-    glOrtho(0,glutGet(GLUT_WINDOW_WIDTH),0,glutGet(GLUT_WINDOW_HEIGHT),-1,1);//se establece una proye orto 2d
-    glMatrixMode(GL_MODELVIEW);//se establece la visualización
+    glOrtho(0,glutGet(GLUT_WINDOW_WIDTH),0,glutGet(GLUT_WINDOW_HEIGHT),-1,1);
+    glMatrixMode(GL_MODELVIEW);
     glPushMatrix();
     glLoadIdentity();
     glDisable(GL_LIGHTING);
-    glDisable(GL_DEPTH_TEST);//se desactivan estos efectos para no afectar el dibujo
+    glDisable(GL_DEPTH_TEST);
     glColor3f(1,0,0);
     glTranslatef(x+10,y+10,0);
     glScalef(1,1,1);
@@ -120,15 +135,15 @@ void corazon(float x,float y)
     glBegin(GL_TRIANGLE_FAN);
     glVertex2f(0,0);
     for(int i=0; i<=180; i+=10) {
-        float r=i*3.14159f/180.f;
+        float r=i*3.14159f/180.0f;
         glVertex2f(5*cos(r)-5,5*sin(r)+5);
     }
     glEnd();
-    //Segunda mitad superior del corazón (lado izquierdo)
+    //Segunda mitad superior del corazón (lado derecho)
     glBegin(GL_TRIANGLE_FAN);
     glVertex2f(0,0);
     for(int i=0; i<=180; i+=10) {
-        float r=i*3.14159f/180.f;
+        float r=i*3.14159f/180.0f;
         glVertex2f(5*cos(r)+5,5*sin(r)+5);
     }
     glEnd();
@@ -146,26 +161,47 @@ void corazon(float x,float y)
     glMatrixMode(GL_MODELVIEW);
 }
 
-/*=======================  INICIALIZAR  =======================*/
+//=======================  INICIALIZAR  =======================//
 void initGL()
 {
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_LIGHTING);
     glEnable(GL_LIGHT0);
-    GLfloat amb[] = {.2f, .2f, .2f, 1}, dif[] = {.8f, .8f, .8f, 1}, pos[] = {0, 10, 10, 1};
-    //se configura las propiedades de la luz
+
+    // Configuración de luz mejorada para mejor aspecto visual
+    GLfloat amb[] = {0.3f, 0.3f, 0.4f, 1.0f};  // Luz ambiental más suave
+    GLfloat dif[] = {0.9f, 0.9f, 0.8f, 1.0f};  // Luz difusa más cálida
+    GLfloat spec[] = {1.0f, 1.0f, 1.0f, 1.0f}; // Especular para brillos
+    GLfloat pos[] = {5.0f, 10.0f, 10.0f, 1.0f}; // Posición de luz
+
     glLightfv(GL_LIGHT0, GL_AMBIENT, amb);
     glLightfv(GL_LIGHT0, GL_DIFFUSE, dif);
+    glLightfv(GL_LIGHT0, GL_SPECULAR, spec);
     glLightfv(GL_LIGHT0, GL_POSITION, pos);
-    glClearColor(0, 0, 0.2f, 1);
 
-    srand(time(nullptr));//Inicializa la generación de objetos usando el tiempo actual
+    // Habilitar materiales con propiedades especulares
+    glEnable(GL_COLOR_MATERIAL);
+    glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE);
+
+    // Propiedades especulares globales
+    GLfloat mat_specular[] = {0.5f, 0.5f, 0.5f, 1.0f};
+    GLfloat mat_shininess[] = {50.0f};
+    glMaterialfv(GL_FRONT, GL_SPECULAR, mat_specular);
+    glMaterialfv(GL_FRONT, GL_SHININESS, mat_shininess);
+
+    glClearColor(0.02f, 0.02f, 0.1f, 1);
+
+    srand(time(NULL));
+
+    // Crear campo de estrellas
+    crearEstrellas();
+
     for(int i = 0; i < 5; ++i) {
         crearAsteroide();
     }
 }
 
-/*=======================  DIBUJO ELEMENTOS  ==================*/
+//=======================  DIBUJO ELEMENTOS  ==================//
 void dibujarPantallaInicio()
 {
     // Titulo
@@ -174,45 +210,243 @@ void dibujarPantallaInicio()
     texto(glutGet(GLUT_WINDOW_WIDTH) / 2 - 150, glutGet(GLUT_WINDOW_HEIGHT) / 2 - 10, "Presiona Enter para empezar el juego", GLUT_BITMAP_HELVETICA_18);
 }
 
+void dibujarAsteroideDetallado(float radio, int tipo)
+{
+    switch(tipo) {
+        case 0: // Asteroide rocoso con cráteres
+            glPushMatrix();
+            glutSolidSphere(radio, 12, 8);
+            // Agregar pequeños cráteres
+            glColor3f(0.5f, 0.3f, 0.1f);
+            for(int i = 0; i < 8; i++) {
+                glPushMatrix();
+                float angX = (i * 45.0f) * 3.14159f / 180.0f;
+                float angY = ((i * 37) % 360) * 3.14159f / 180.0f;
+                glTranslatef(radio * 0.8f * cos(angX), radio * 0.6f * sin(angY), radio * 0.7f * sin(angX));
+                glutSolidSphere(radio * 0.15f, 6, 4);
+                glPopMatrix();
+            }
+            glPopMatrix();
+            break;
+
+        case 1: // Asteroide metálico
+            glPushMatrix();
+            glutSolidSphere(radio * 0.9f, 10, 8);
+            // Agregar protuberancias metálicas
+            glColor3f(0.6f, 0.6f, 0.5f);
+            for(int i = 0; i < 6; i++) {
+                glPushMatrix();
+                float ang = (i * 60.0f) * 3.14159f / 180.0f;
+                glTranslatef(radio * cos(ang), 0, radio * sin(ang));
+                glutSolidCube(radio * 0.3f);
+                glPopMatrix();
+            }
+            glPopMatrix();
+            break;
+
+        case 2: // Asteroide cristalino
+            glPushMatrix();
+            // Núcleo principal
+            glutSolidSphere(radio * 0.8f, 8, 6);
+            // Cristales sobresalientes
+            glColor3f(0.4f, 0.6f, 0.8f);
+            for(int i = 0; i < 12; i++) {
+                glPushMatrix();
+                float angX = (i * 30.0f) * 3.14159f / 180.0f;
+                float angY = ((i * 47) % 360) * 3.14159f / 180.0f;
+                glTranslatef(
+                    radio * 0.9f * cos(angX) * cos(angY),
+                    radio * 0.9f * sin(angX),
+                    radio * 0.9f * cos(angX) * sin(angY)
+                );
+                glRotatef(i * 15, 1, 0, 0);
+                glScalef(0.3f, 2.0f, 0.3f);
+                glutSolidCube(radio * 0.2f);
+                glPopMatrix();
+            }
+            glPopMatrix();
+            break;
+    }
+}
+
+void dibujarNaveDetallada()
+{
+    // Cuerpo principal de la nave (más detallado)
+    glPushMatrix();
+
+    // Fuselaje principal - azul metálico
+    GLfloat colPrincipal[] = {0.2f, 0.6f, 1.0f, 1.0f};
+    glMaterialfv(GL_FRONT, GL_DIFFUSE, colPrincipal);
+    glPushMatrix();
+    glScalef(0.4f, 0.8f, 2.0f);
+    glutSolidSphere(0.8f, 12, 8);
+    glPopMatrix();
+
+    // Cabina/cockpit - cristal azul claro
+    GLfloat colCockpit[] = {0.7f, 0.9f, 1.0f, 0.8f};
+    glMaterialfv(GL_FRONT, GL_DIFFUSE, colCockpit);
+    glPushMatrix();
+    glTranslatef(0, 0.2f, 0.3f);
+    glScalef(0.3f, 0.4f, 0.6f);
+    glutSolidSphere(0.5f, 8, 6);
+    glPopMatrix();
+
+    // Alas laterales
+    GLfloat colAlas[] = {0.1f, 0.4f, 0.7f, 1.0f};
+    glMaterialfv(GL_FRONT, GL_DIFFUSE, colAlas);
+
+    // Ala izquierda
+    glPushMatrix();
+    glTranslatef(-0.8f, 0, -0.2f);
+    glScalef(1.2f, 0.1f, 0.8f);
+    glutSolidCube(0.8f);
+    glPopMatrix();
+
+    // Ala derecha
+    glPushMatrix();
+    glTranslatef(0.8f, 0, -0.2f);
+    glScalef(1.2f, 0.1f, 0.8f);
+    glutSolidCube(0.8f);
+    glPopMatrix();
+
+    // Motores en las alas
+    GLfloat colMotor[] = {0.8f, 0.3f, 0.1f, 1.0f};
+    glMaterialfv(GL_FRONT, GL_DIFFUSE, colMotor);
+
+    // Motor izquierdo
+    glPushMatrix();
+    glTranslatef(-0.8f, 0, -0.8f);
+    glRotatef(90, 1, 0, 0);
+    gluCylinder(gluNewQuadric(), 0.15f, 0.15f, 0.6f, 8, 4);
+    glPopMatrix();
+
+    // Motor derecho
+    glPushMatrix();
+    glTranslatef(0.8f, 0, -0.8f);
+    glRotatef(90, 1, 0, 0);
+    gluCylinder(gluNewQuadric(), 0.15f, 0.15f, 0.6f, 8, 4);
+    glPopMatrix();
+
+    // Cañón frontal
+    GLfloat colCanon[] = {0.6f, 0.6f, 0.6f, 1.0f};
+    glMaterialfv(GL_FRONT, GL_DIFFUSE, colCanon);
+    glPushMatrix();
+    glTranslatef(0, -0.1f, 0.8f);
+    glRotatef(90, 1, 0, 0);
+    gluCylinder(gluNewQuadric(), 0.08f, 0.08f, 0.4f, 6, 4);
+    glPopMatrix();
+
+    // Luces de navegación (pequeñas esferas brillantes)
+    GLfloat colLuces[] = {1.0f, 1.0f, 0.2f, 1.0f};
+    glMaterialfv(GL_FRONT, GL_DIFFUSE, colLuces);
+
+    // Luz izquierda
+    glPushMatrix();
+    glTranslatef(-0.5f, 0, 0.6f);
+    glutSolidSphere(0.05f, 6, 4);
+    glPopMatrix();
+
+    // Luz derecha
+    glPushMatrix();
+    glTranslatef(0.5f, 0, 0.6f);
+    glutSolidSphere(0.05f, 6, 4);
+    glPopMatrix();
+
+    glPopMatrix();
+}
+
 void dibujarNave()
 {
     glPushMatrix();
-    glTranslatef(naveX,naveY,naveZ);
-    GLfloat col[]= {0,0.5f,1,1};
-    glMaterialfv(GL_FRONT,GL_DIFFUSE,col);
-    glPushMatrix();
-    glRotatef(-90,1,0,0);
-    glutSolidCone(0.3,1,8,8);
-    glPopMatrix();
-    glPushMatrix();
-    glScalef(1.5f,0.1f,0.3f);
-    glutSolidCube(1);
-    glPopMatrix();
+    glTranslatef(naveX, naveY, naveZ);
+
+    // Pequeña animación de oscilación cuando se mueve
+    static float tiempo = 0;
+    tiempo += 0.1f;
+    if(naveX != 0 || naveY != 0) {
+        glRotatef(sin(tiempo * 2) * 2, 0, 0, 1); // Leve balanceo
+    }
+
+    dibujarNaveDetallada();
     glPopMatrix();
 }
 
 void dibujarAsteroides()
 {
-    GLfloat col[]= {0.7f,0.4f,0.2f,1};
-    glMaterialfv(GL_FRONT,GL_DIFFUSE,col);
-    for(auto &a:asts) if(a.activo) {
+    for(size_t i = 0; i < asts.size(); ++i) {
+        if(asts[i].activo) {
             glPushMatrix();
-            glTranslatef(a.x,a.y,a.z);
-            glutSolidSphere(a.radio,8,8);
+            glTranslatef(asts[i].x, asts[i].y, asts[i].z);
+
+            // Aplicar rotación del asteroide
+            glRotatef(asts[i].rotX, 1, 0, 0);
+            glRotatef(asts[i].rotY, 0, 1, 0);
+            glRotatef(asts[i].rotZ, 0, 0, 1);
+
+            // Color base según tipo
+            GLfloat col[4];
+            switch(asts[i].tipo) {
+                case 0: // Rocoso - marrón
+                    col[0] = 0.7f; col[1] = 0.4f; col[2] = 0.2f; col[3] = 1.0f;
+                    break;
+                case 1: // Metálico - gris
+                    col[0] = 0.5f; col[1] = 0.5f; col[2] = 0.6f; col[3] = 1.0f;
+                    break;
+                case 2: // Cristalino - azul
+                    col[0] = 0.3f; col[1] = 0.5f; col[2] = 0.9f; col[3] = 1.0f;
+                    break;
+            }
+            glMaterialfv(GL_FRONT, GL_DIFFUSE, col);
+
+            dibujarAsteroideDetallado(asts[i].radio, asts[i].tipo);
             glPopMatrix();
         }
+    }
 }
 
 void dibujarProyectiles()
 {
-    GLfloat col[]= {1,1,0,1};
+    GLfloat col[]= {1,1,0.2f,1};
     glMaterialfv(GL_FRONT,GL_DIFFUSE,col);
-    for(auto &p:pros) if(p.activo) {
+
+    for(size_t i = 0; i < pros.size(); ++i) {
+        if(pros[i].activo) {
             glPushMatrix();
-            glTranslatef(p.x,p.y,p.z);
-            glutSolidSphere(0.1,6,6);
+            glTranslatef(pros[i].x, pros[i].y, pros[i].z);
+
+            // Hacer que los proyectiles roten
+            static float rotacion = 0;
+            rotacion += 5.0f;
+            glRotatef(rotacion, 0, 0, 1);
+
+            // Proyectil con forma de estrella/diamante
+            glBegin(GL_TRIANGLES);
+            // Frente
+            glVertex3f(0, 0, 0.15f);
+            glVertex3f(-0.05f, -0.05f, -0.15f);
+            glVertex3f(0.05f, -0.05f, -0.15f);
+
+            glVertex3f(0, 0, 0.15f);
+            glVertex3f(0.05f, -0.05f, -0.15f);
+            glVertex3f(0.05f, 0.05f, -0.15f);
+
+            glVertex3f(0, 0, 0.15f);
+            glVertex3f(0.05f, 0.05f, -0.15f);
+            glVertex3f(-0.05f, 0.05f, -0.15f);
+
+            glVertex3f(0, 0, 0.15f);
+            glVertex3f(-0.05f, 0.05f, -0.15f);
+            glVertex3f(-0.05f, -0.05f, -0.15f);
+            glEnd();
+
+            // Añadir un pequeño efecto de brillo
+            GLfloat colBrillo[] = {1.0f, 1.0f, 1.0f, 1.0f};
+            glMaterialfv(GL_FRONT, GL_DIFFUSE, colBrillo);
+            glutSolidSphere(0.03f, 6, 4);
+
             glPopMatrix();
         }
+    }
 }
 
 void dibujarParticulas()
@@ -220,11 +454,72 @@ void dibujarParticulas()
     glDisable(GL_LIGHTING);
     glPointSize(3);
     glBegin(GL_POINTS);
-    for(auto &p:parts) {
-        glColor4f(1,1,0,p.vida);
-        glVertex3f(p.x,p.y,p.z);
+    for(size_t i = 0; i < parts.size(); ++i) {
+        glColor4f(1,1,0,parts[i].vida);
+        glVertex3f(parts[i].x,parts[i].y,parts[i].z);
     }
     glEnd();
+    glEnable(GL_LIGHTING);
+}
+
+void crearEstrellas()
+{
+    estrellas.clear();
+    for(int i = 0; i < 200; ++i) {
+        Estrella e;
+        e.x = (rand() % 200 - 100);
+        e.y = (rand() % 200 - 100);
+        e.z = -(rand() % 100 + 20);
+        e.brillo = 0.3f + (rand() % 70) / 100.0f;
+        estrellas.push_back(e);
+    }
+}
+
+void dibujarFondo()
+{
+    // Desactivar iluminación para el fondo
+    glDisable(GL_LIGHTING);
+    glDisable(GL_DEPTH_TEST);
+
+    // Gradiente de fondo (simula atmósfera espacial)
+    glBegin(GL_QUADS);
+    // Parte superior - azul oscuro
+    glColor3f(0.02f, 0.02f, 0.2f);
+    glVertex3f(-50, 20, -30);
+    glVertex3f(50, 20, -30);
+    // Parte inferior - casi negro
+    glColor3f(0.01f, 0.01f, 0.05f);
+    glVertex3f(50, -20, -30);
+    glVertex3f(-50, -20, -30);
+    glEnd();
+
+    // Dibujar estrellas
+    glPointSize(2);
+    glBegin(GL_POINTS);
+    for(size_t i = 0; i < estrellas.size(); ++i) {
+        float brillo = estrellas[i].brillo + 0.2f * sin(glutGet(GLUT_ELAPSED_TIME) * 0.005f + i);
+        if(brillo > 1.0f) brillo = 1.0f;
+        if(brillo < 0.2f) brillo = 0.2f;
+
+        glColor3f(brillo, brillo, brillo * 1.1f);
+        glVertex3f(estrellas[i].x, estrellas[i].y, estrellas[i].z);
+    }
+    glEnd();
+
+    // Algunas estrellas más brillantes
+    glPointSize(4);
+    glBegin(GL_POINTS);
+    for(size_t i = 0; i < estrellas.size(); i += 15) {
+        float brillo = 0.8f + 0.3f * sin(glutGet(GLUT_ELAPSED_TIME) * 0.003f + i * 0.1f);
+        if(brillo > 1.0f) brillo = 1.0f;
+
+        glColor3f(brillo, brillo * 0.9f, brillo * 0.7f);
+        glVertex3f(estrellas[i].x * 0.8f, estrellas[i].y * 0.8f, estrellas[i].z * 0.5f);
+    }
+    glEnd();
+
+    // Reactivar efectos para objetos 3D
+    glEnable(GL_DEPTH_TEST);
     glEnable(GL_LIGHTING);
 }
 
@@ -232,31 +527,47 @@ void crearAsteroide()
 {
     Asteroide a;
     a.activo = true;
-    float ang = (rand() % 360) * 3.14159f / 180.f;
+    float ang = (rand() % 360) * 3.14159f / 180.0f;
     float d = 15 + (rand() % 10);
     a.x = cos(ang) * d + naveX;
     a.y = (rand() % 10 - 5) + naveY;
     a.z = -20 - (rand() % 15);
     float dx = naveX - a.x, dy = naveY - a.y, dz = naveZ - a.z;
     float L = sqrt(dx * dx + dy * dy + dz * dz), v = 0.05f + (rand() % 3) * 0.02f;
+   if(L > 25) L = 25;
     a.vx = dx / L * v;
     a.vy = dy / L * v;
     a.vz = dz / L * v;
     a.radio = 0.5f + (rand() % 3) * 0.3f;
-    asts.push_back(a);  // Agrega el asteroide a la lista
+
+    // Nuevas propiedades para asteroides mejorados
+    a.rotX = rand() % 360;
+    a.rotY = rand() % 360;
+    a.rotZ = rand() % 360;
+    a.velRotX = (rand() % 200 - 100) / 100.0f;
+    a.velRotY = (rand() % 200 - 100) / 100.0f;
+    a.velRotZ = (rand() % 200 - 100) / 100.0f;
+    a.tipo = rand() % 3; // 0=rocoso, 1=metálico, 2=cristalino
+
+    asts.push_back(a);
 }
 
 void crearExplosion(float x, float y, float z)
 {
     for (int i = 0; i < 80; ++i) {
-        Particula p{ x, y, z,
-                     ((rand() % 100) / 50.f) - 1, ((rand() % 100) / 50.f) - 1, ((rand() % 100) / 50.f) - 1,
-                     1.0f };
-        parts.push_back(p);  // Agrega la particula a la lista
+        Particula p;
+        p.x = x;
+        p.y = y;
+        p.z = z;
+        p.vx = ((rand() % 100) / 50.0f) - 1.0f;
+        p.vy = ((rand() % 100) / 50.0f) - 1.0f;
+        p.vz = ((rand() % 100) / 50.0f) - 1.0f;
+        p.vida = 1.0f;
+        parts.push_back(p);
     }
 }
 
-/*=======================  ACTUALIZAR MUNDO  ==================*/
+//=======================  ACTUALIZAR MUNDO  ==================//
 void actualizar()
 {
     if (!gameStarted) {
@@ -266,13 +577,30 @@ void actualizar()
         return;
     }
 
+    // Actualizar estrellas para efecto de movimiento
+    for(size_t i = 0; i < estrellas.size(); ++i) {
+        estrellas[i].x += (naveX * 0.001f - estrellas[i].x * 0.0001f);
+        estrellas[i].y += (naveY * 0.001f - estrellas[i].y * 0.0001f);
+
+        if(estrellas[i].x > 100) estrellas[i].x = -100;
+        if(estrellas[i].x < -100) estrellas[i].x = 100;
+        if(estrellas[i].y > 100) estrellas[i].y = -100;
+        if(estrellas[i].y < -100) estrellas[i].y = 100;
+    }
+
     // Mover asteroides
     for(size_t i=0; i<asts.size();) {
-        auto &a=asts[i];
+        Asteroide &a = asts[i];
         a.x+=a.vx;
         a.y+=a.vy;
         a.z+=a.vz;
-        if(sqrt((a.x-naveX)*(a.x-naveX)+(a.y-naveY)*(a.y-naveY)+(a.z-naveZ)*(a.z-naveZ))>30||a.z>10) {
+
+        // Actualizar rotación de asteroides
+        a.rotX += a.velRotX;
+        a.rotY += a.velRotY;
+        a.rotZ += a.velRotZ;
+         float distXZ = sqrt((a.x-naveX)*(a.x-naveX)+(a.y-naveY)*(a.y-naveY)+(a.z-naveZ)*(a.z-naveZ));
+        if(distXZ>40||a.z>10) {
             asts.erase(asts.begin()+i);
             continue;
         }
@@ -283,7 +611,7 @@ void actualizar()
                 asts.erase(asts.begin()+i);
             } else {
                 crearExplosion(naveX,naveY,naveZ);
-                explosionEnProceso = true;  // Marcar que la explosión está en proceso
+                explosionEnProceso = true;
                 explosionTimer = 40;
                 isNaveVisible = false;
                 asts.erase(asts.begin()+i);
@@ -291,28 +619,25 @@ void actualizar()
             continue;
         }
         ++i;
-        if (explosionEnProceso) {
-            explosionTimer--;  // Decrementar el temporizador de espera
-            // Después de la espera, activar el estado de gameOver
-            if (explosionTimer <= 0) {
-                gameOver = true;
-                explosionEnProceso = false;
-            }
+    }
+
+    if (explosionEnProceso) {
+        explosionTimer--;
+        if (explosionTimer <= 0) {
+            gameOver = true;
+            explosionEnProceso = false;
         }
     }
+
     static int spawn=0;
-    /*usa para controlar el tiempo entre las generaciones de asteroides.
-    su valor se mantiene entre llamadas a la función. Al ser estática, su valor
-    no se reinicia a 0 cada vez que la función es llamada*/
-    int spawnRate = 120;  // Frecuencia de generación de asteroides por defecto
-    int total=8; // total de asteroides
-    // Si el puntaje es mayor a 100, aumentar la frecuencia de creación de asteroides
+    int spawnRate = 120;
+    int total=8;
     if (score > 100) {
-        spawnRate = 80;  // Generar más rápido si el puntaje supera 100
+        spawnRate = 80;
         total=9;
     }
     if (score > 300) {
-        spawnRate = 50;  // Generar más rápido si el puntaje supera 100
+        spawnRate = 50;
         total=10;
     }
 
@@ -321,23 +646,24 @@ void actualizar()
         spawn = 0;
     }
 
-// Proyectiles
+    // Proyectiles
     for(size_t i=0; i<pros.size();) {
-        auto &p=pros[i];
+        Proyectil &p = pros[i];
         p.z+=p.vz;
         if(p.z<-35) {
             pros.erase(pros.begin()+i);
             continue;
         }
         bool borrado=false;
-        for(size_t j=0; j<asts.size(); ++j) if(asts[j].activo &&
-                                                   colision(p.x,p.y,p.z,0.2f,asts[j].x,asts[j].y,asts[j].z,asts[j].radio)) {
+        for(size_t j=0; j<asts.size(); ++j) {
+            if(asts[j].activo && colision(p.x,p.y,p.z,0.2f,asts[j].x,asts[j].y,asts[j].z,asts[j].radio)) {
                 crearExplosion(asts[j].x,asts[j].y,asts[j].z);
                 asts.erase(asts.begin()+j);
                 borrado=true;
                 score+=10;
                 break;
             }
+        }
         if(borrado) {
             pros.erase(pros.begin()+i);
             continue;
@@ -345,9 +671,9 @@ void actualizar()
         ++i;
     }
 
-// Particulas
+    // Particulas
     for(size_t i=0; i<parts.size();) {
-        auto &p=parts[i];
+        Particula &p = parts[i];
         p.x+=p.vx;
         p.y+=p.vy;
         p.z+=p.vz;
@@ -358,11 +684,10 @@ void actualizar()
         }
         ++i;
     }
-
 }
 
-/*=======================  DISPLAY  ===========================*/
-void display() //función que se va encargar de renderizar nuestro programa
+//=======================  DISPLAY  ===========================//
+void display()
 {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glMatrixMode(GL_MODELVIEW);
@@ -371,13 +696,15 @@ void display() //función que se va encargar de renderizar nuestro programa
         dibujarPantallaInicio();
     } else {
         // Camara orbital
-        float yawR = camYaw * 3.14159f / 180.f, pitR = camPitch * 3.14159f / 180.f;//para rotar la camara
+        float yawR = camYaw * 3.14159f / 180.0f, pitR = camPitch * 3.14159f / 180.0f;
         float cx = camDist * cos(pitR) * sin(yawR);
         float cy = camDist * sin(pitR);
         float cz = camDist * cos(pitR) * cos(yawR);
         gluLookAt(cx + naveX, cy + naveY + 2, cz + naveZ, naveX, naveY, naveZ, 0, 1, 0);
-        //configura la posición de la cámara y la dirección hacia la que debe mirar.
-        //dibujarNave();
+
+        // Dibujar fondo con estrellas primero
+        dibujarFondo();
+
         dibujarAsteroides();
         dibujarProyectiles();
         dibujarParticulas();
@@ -400,7 +727,7 @@ void display() //función que se va encargar de renderizar nuestro programa
     glutSwapBuffers();
 }
 
-/*=======================  CALLBACKS I/O  =====================*/
+//=======================  CALLBACKS I/O  =====================//
 void reshape(int w,int h)
 {
     glViewport(0,0,w,h);
@@ -437,8 +764,15 @@ void mouse(int button, int state, int x, int y)
     }
 
     if (button == GLUT_RIGHT_BUTTON && state == GLUT_DOWN && !gameOver) {
-        Proyectil p = { naveX, naveY, naveZ - 1, 0, 0, -0.8f, true };
-        pros.push_back(p);  // Crear un proyectil nuevo
+        Proyectil p;
+        p.x = naveX;
+        p.y = naveY;
+        p.z = naveZ - 1;
+        p.vx = 0;
+        p.vy = 0;
+        p.vz = -0.8f;
+        p.activo = true;
+        pros.push_back(p);
     }
 }
 
@@ -468,9 +802,9 @@ void keyboard(unsigned char k, int x, int y)
     if (!gameStarted) {
         if (k == 13) {  // Enter key
             gameStarted = true;
-            gameOver=false; // Comienza el juego
+            gameOver=false;
         }
-        return;  // Si el juego no ha comenzado, no hacer nada más
+        return;
     }
 
     if (k == 'r' || k == 'R') {  // Reiniciar juego
@@ -480,28 +814,38 @@ void keyboard(unsigned char k, int x, int y)
         pros.clear();
         parts.clear();
         gameOver = false;
-        gameStarted = false;  // Volver a la pantalla de inicio
-        explosionEnProceso = false;  // Asegurarse de que no haya una explosión activa
-        explosionTimer = 0;  // Resetear temporizador de la explosión
-        isNaveVisible = true;  // Asegurarse de que la nave sea visible
+        gameStarted = false;
+        explosionEnProceso = false;
+        explosionTimer = 0;
+        isNaveVisible = true;
+
+        // Recrear campo de estrellas
+        crearEstrellas();
     }
 
     if (k == ' ' && !gameOver) {  // Disparar
-        Proyectil p = { naveX, naveY, naveZ - 1, 0, 0, -0.8f, true };
+        Proyectil p;
+        p.x = naveX;
+        p.y = naveY;
+        p.z = naveZ - 1;
+        p.vx = 0;
+        p.vy = 0;
+        p.vz = -0.8f;
+        p.activo = true;
         pros.push_back(p);
     }
 
-    /* Modificar sensibilidad */
+    /* Modificar zoom */
     if (k == '+' || k == '=') {
-        camDist -= zoomStep;  // Acercar cámara
+        camDist -= zoomStep;
         if (camDist < camDistMin) {
-            camDist = camDistMin;  // No dejar que se acerque más de lo permitido
+            camDist = camDistMin;
         }
     }
     if (k == '-') {
-        camDist += zoomStep;  // Alejar cámara
+        camDist += zoomStep;
         if (camDist > camDistMax) {
-            camDist = camDistMax;  // No dejar que se aleje más de lo permitido
+            camDist = camDistMax;
         }
     }
 
@@ -567,14 +911,14 @@ void special(int k,int,int)
     }
 }
 
-void timer(int)//manejar el tiempo de actualización de la escena
+void timer(int)
 {
     actualizar();
-    glutPostRedisplay();// Solicita a GLUT que actualice correctamente
+    glutPostRedisplay();
     glutTimerFunc(16,timer,0);   // ~60 FPS
 }
 
-/*=======================  FIN =====================================*/
+//=======================  MAIN  ===============================//
 
 int main(int argc, char** argv)
 {
