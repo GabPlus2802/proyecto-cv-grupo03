@@ -45,6 +45,8 @@ bool gameStarted = false;
 bool gamePaused = false;
 bool isNaveVisible = true; // Variable que indica si la nave es visible o no
 int lastLifeBonus = 0;  // Ãšltimo puntaje mÃºltiplo de 200 donde se otorgÃ³ vida
+bool mostrandoInstrucciones = true;
+
 
 //=======================  CAMARA  ============================//
 float camDist   = 15.0f;                 // distancia actual
@@ -82,6 +84,7 @@ void dibujarAsteroideDetallado(float, int);
 void dibujarNaveDetallada(void);
 void dibujarBotonPausa(void);
 void dibujarPantallaPausa(void);
+void dibujarPantallaInstrucciones(void);
 void dibujarMinimapa(void);
 void mostrarCoordenadas(void);
 void actualizar(void);
@@ -592,6 +595,17 @@ void dibujarPantallaPausa()
     glMatrixMode(GL_MODELVIEW);
 }
 
+void dibujarPantallaInstrucciones()
+{
+    texto(glutGet(GLUT_WINDOW_WIDTH) / 2 - 100, glutGet(GLUT_WINDOW_HEIGHT) / 2 + 60, "INSTRUCCIONES", GLUT_BITMAP_TIMES_ROMAN_24);
+    texto(100, glutGet(GLUT_WINDOW_HEIGHT) / 2 + 20, "- Usa WASD o Flechas para mover la nave");
+    texto(100, glutGet(GLUT_WINDOW_HEIGHT) / 2 - 10, "- Espacio o click derecho para disparar");
+    texto(100, glutGet(GLUT_WINDOW_HEIGHT) / 2 - 40, "- P para pausar");
+    texto(100, glutGet(GLUT_WINDOW_HEIGHT) / 2 - 70, "- Evita los asteroides y gana puntos");
+    texto(100, glutGet(GLUT_WINDOW_HEIGHT) / 2 - 100, "- Presiona Enter para comenzar");
+}
+
+
 void dibujarMinimapa()
 {
     // Configurar viewport para el minimapa
@@ -1019,7 +1033,11 @@ void display()
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
     if (!gameStarted) {
+        if (!mostrandoInstrucciones) {
+        dibujarPantallaInstrucciones();
+        } else {
         dibujarPantallaInicio();
+        }
     } else {
         //dibujarSkybox();
         // Camara orbital
@@ -1188,12 +1206,18 @@ void keyboard(unsigned char k, int x, int y)
     }
 
     if (!gameStarted) {
-        if (k == 13) {  // Enter key
-            gameStarted = true;
-            gameOver=false;
-        }
-        return;
+       if (k == 13) {  // Enter key
+           if (mostrandoInstrucciones) {
+               mostrandoInstrucciones = false;  // Mostrar pantalla de inicio
+           } else {
+               gameStarted = true;
+               gameOver = false;
+           }
+       }
+       return;
     }
+
+
 
     if (k == 'p' || k == 'P') {  // Pausar/Reanudar juego
         gamePaused = !gamePaused;
