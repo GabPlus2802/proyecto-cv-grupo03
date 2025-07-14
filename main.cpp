@@ -486,12 +486,24 @@ void dibujarParticulas()
 void crearEstrellas()
 {
     estrellas.clear();
-    for(int i = 0; i < 200; ++i) {
+    for (int i = 0; i < 300; ++i) {
         Estrella e;
-        e.x = (rand() % 400 - 100);
-        e.y = (rand() % 400 - 200);
-        e.z = -(rand() % 100 + 20);
+
+        // Rango de distancias para las estrellas: aleatorio entre 20 y 100 para crear profundidad.
+        float distancia = rand() % 100 + 60;
+
+        // Crear estrellas en diferentes direcciones alrededor de la nave
+        float anguloAzimut = rand() % 360; // Ángulo azimutal (en el plano X-Y)
+        float anguloElevacion = rand() % 180 - 90; // Ángulo de elevación (para la dirección Z, -90 a 90)
+
+        // Convertimos estos ángulos a coordenadas 3D
+        e.x = distancia * cos(anguloElevacion * M_PI / 180.0f) * sin(anguloAzimut * M_PI / 180.0f);
+        e.y = distancia * cos(anguloElevacion * M_PI / 180.0f) * cos(anguloAzimut * M_PI / 180.0f);
+        e.z = distancia * sin(anguloElevacion * M_PI / 180.0f);
+
+        // Brillo aleatorio de las estrellas
         e.brillo = 0.3f + (rand() % 70) / 100.0f;
+
         estrellas.push_back(e);
     }
 }
