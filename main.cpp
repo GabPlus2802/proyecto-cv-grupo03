@@ -42,6 +42,7 @@ std::vector<Estrella> estrellas;
 int score = 0, lives = 3;
 bool gameOver = false;
 bool gameStarted = false;
+bool gamePaused = false;
 bool isNaveVisible = true; // Variable que indica si la nave es visible o no
 int lastLifeBonus = 0;  // Ãšltimo puntaje mÃºltiplo de 200 donde se otorgÃ³ vida
 
@@ -79,15 +80,17 @@ void crearEstrellas(void);
 void dibujarFondo(void);
 void dibujarAsteroideDetallado(float, int);
 void dibujarNaveDetallada(void);
+void dibujarBotonPausa(void);
+void dibujarPantallaPausa(void);
 void dibujarMinimapa(void);
 void mostrarCoordenadas(void);
 void actualizar(void);
 void display(void);
-void reshape(int,int);
-void keyboard(unsigned char,int,int);
+void reshape(int, int);
+void keyboard(unsigned char, int, int);
 void special(int,int,int);
-void mouse(int,int,int,int);
-void motion(int,int);
+void mouse(int, int, int, int);
+void motion(int, int);
 void moverNaveRelativaACamara(float, float);
 void timer(int);
 
@@ -98,6 +101,7 @@ bool colision(float x1,float y1,float z1,float r1,
     float dx=x1-x2, dy=y1-y2, dz=z1-z2;
     return sqrt(dx*dx+dy*dy+dz*dz) < (r1+r2);
 }
+
 
 //=======================  DIBUJO SIMPLE  =====================//
 void texto(float x, float y, const std::string& s, void* f=GLUT_BITMAP_HELVETICA_18)
@@ -486,6 +490,108 @@ void dibujarParticulas()
     glEnable(GL_LIGHTING);
 }
 
+void dibujarBotonPausa()
+{
+    if (!gameStarted || gameOver) return;
+
+    // Configurar para dibujo 2D
+    glMatrixMode(GL_PROJECTION);
+    glPushMatrix();
+    glLoadIdentity();
+    glOrtho(0, glutGet(GLUT_WINDOW_WIDTH), 0, glutGet(GLUT_WINDOW_HEIGHT), -1, 1);
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glLoadIdentity();
+
+    glDisable(GL_LIGHTING);
+    glDisable(GL_DEPTH_TEST);
+
+    // Posición del botón (centro superior)
+    float buttonX = glutGet(GLUT_WINDOW_WIDTH) / 2 - 30;
+    float buttonY = glutGet(GLUT_WINDOW_HEIGHT) - 40;
+    float buttonWidth = 60;
+    float buttonHeight = 25;
+
+    // Dibujar fondo del botón
+    if (gamePaused) {
+        glColor4f(0.8f, 0.8f, 0.8f, 0.8f);
+    } else {
+        glColor4f(0.2f, 0.2f, 0.2f, 0.8f);
+    }
+
+    glBegin(GL_QUADS);
+    glVertex2f(buttonX, buttonY);
+    glVertex2f(buttonX + buttonWidth, buttonY);
+    glVertex2f(buttonX + buttonWidth, buttonY + buttonHeight);
+    glVertex2f(buttonX, buttonY + buttonHeight);
+    glEnd();
+
+    // Dibujar borde del botón
+    glColor3f(1.0f, 1.0f, 1.0f);
+    glLineWidth(1);
+    glBegin(GL_LINE_LOOP);
+    glVertex2f(buttonX, buttonY);
+    glVertex2f(buttonX + buttonWidth, buttonY);
+    glVertex2f(buttonX + buttonWidth, buttonY + buttonHeight);
+    glVertex2f(buttonX, buttonY + buttonHeight);
+    glEnd();
+
+    // Texto del botón
+    glColor3f(1.0f, 1.0f, 1.0f);
+    texto(buttonX + 15, buttonY + 8, gamePaused ? "RESUME" : "PAUSE", GLUT_BITMAP_HELVETICA_12);
+
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_LIGHTING);
+
+    glPopMatrix();
+    glMatrixMode(GL_PROJECTION);
+    glPopMatrix();
+    glMatrixMode(GL_MODELVIEW);
+}
+
+void dibujarPantallaPausa()
+{
+    if (!gamePaused) return;
+
+    // Configurar para dibujo 2D
+    glMatrixMode(GL_PROJECTION);
+    glPushMatrix();
+    glLoadIdentity();
+    glOrtho(0, glutGet(GLUT_WINDOW_WIDTH), 0, glutGet(GLUT_WINDOW_HEIGHT), -1, 1);
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glLoadIdentity();
+
+    glDisable(GL_LIGHTING);
+    glDisable(GL_DEPTH_TEST);
+
+    // Overlay transparente gris
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    glColor4f(0.2f, 0.2f, 0.2f, 0.7f);
+    glBegin(GL_QUADS);
+    glVertex2f(0, 0);
+    glVertex2f(glutGet(GLUT_WINDOW_WIDTH), 0);
+    glVertex2f(glutGet(GLUT_WINDOW_WIDTH), glutGet(GLUT_WINDOW_HEIGHT));
+    glVertex2f(0, glutGet(GLUT_WINDOW_HEIGHT));
+    glEnd();
+
+    // Texto de pausa
+    glColor3f(1.0f, 1.0f, 1.0f);
+    texto(glutGet(GLUT_WINDOW_WIDTH) / 2 - 80, glutGet(GLUT_WINDOW_HEIGHT) / 2 + 20, "JUEGO PAUSADO", GLUT_BITMAP_TIMES_ROMAN_24);
+    texto(glutGet(GLUT_WINDOW_WIDTH) / 2 - 120, glutGet(GLUT_WINDOW_HEIGHT) / 2 - 20, "Presiona P para continuar", GLUT_BITMAP_HELVETICA_18);
+
+    glDisable(GL_BLEND);
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_LIGHTING);
+
+    glPopMatrix();
+    glMatrixMode(GL_PROJECTION);
+    glPopMatrix();
+    glMatrixMode(GL_MODELVIEW);
+}
+
 void dibujarMinimapa()
 {
     // Configurar viewport para el minimapa
@@ -755,7 +861,7 @@ void mostrarCoordenadas()
 //=======================  ACTUALIZAR MUNDO  ==================//
 void actualizar()
 {
-    if (!gameStarted) {
+    if (!gameStarted || gamePaused) {
         return;
     }
     if(gameOver) {
@@ -951,6 +1057,9 @@ void display()
            texto(glutGet(GLUT_WINDOW_WIDTH) / 2 - 80, glutGet(GLUT_WINDOW_HEIGHT) / 2, "GAME OVER", GLUT_BITMAP_TIMES_ROMAN_24);
            texto(glutGet(GLUT_WINDOW_WIDTH) / 2 - 80, glutGet(GLUT_WINDOW_HEIGHT) / 2 - 30, "Press R to restart");
         }
+
+        dibujarBotonPausa();
+        dibujarPantallaPausa();
     }
 
     glutSwapBuffers();
@@ -967,6 +1076,24 @@ void reshape(int w,int h)
 
 void mouse(int button, int state, int x, int y)
 {
+
+    if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN && gameStarted && !gameOver) {
+        // Convertir coordenadas de mouse (Y invertida)
+        int mouseY = glutGet(GLUT_WINDOW_HEIGHT) - y;
+
+        // Verificar si se hizo clic en el botón de pausa
+        float buttonX = glutGet(GLUT_WINDOW_WIDTH) / 2 - 30;
+        float buttonY = glutGet(GLUT_WINDOW_HEIGHT) - 40;
+        float buttonWidth = 60;
+        float buttonHeight = 25;
+
+        if (x >= buttonX && x <= buttonX + buttonWidth &&
+            mouseY >= buttonY && mouseY <= buttonY + buttonHeight) {
+            gamePaused = !gamePaused;
+            return;
+        }
+    }
+
     if (button == GLUT_LEFT_BUTTON) {
         if (state == GLUT_DOWN) {
             mouseDown = true;
@@ -1068,6 +1195,11 @@ void keyboard(unsigned char k, int x, int y)
         return;
     }
 
+    if (k == 'p' || k == 'P') {  // Pausar/Reanudar juego
+        gamePaused = !gamePaused;
+        return;
+    }
+
     if (k == 'r' || k == 'R') {  // Reiniciar juego
         score = 0;
         lives = 3;
@@ -1077,6 +1209,7 @@ void keyboard(unsigned char k, int x, int y)
         parts.clear();
         gameOver = false;
         gameStarted = false;
+        gamePaused = false;
         explosionEnProceso = false;
         explosionTimer = 0;
         isNaveVisible = true;
