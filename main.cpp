@@ -1,7 +1,7 @@
-/*********************************************************************
-*   NAVE VS ASTEROIDES 3D + camara orbital + zoom + sensibilidad     *
-*   Compilar (ejemplo GCC):  g++ -std=c++11 juego.cpp -lGL -lGLU -lglut         *
-*********************************************************************/
+/************************************************************************
+*   NAVE VS ASTEROIDES 3D + camara orbital + zoom + sensibilidad        *
+*   Compilar (ejemplo GCC):  g++ -std=c++11 juego.cpp -lGL -lGLU -lglut *
+*************************************************************************/
 #include <GL/glut.h>
 #include <iostream>
 #include <vector>
@@ -33,20 +33,26 @@ struct Estrella {
     float brillo;
 };
 
+struct Planeta {
+    float x, y, z;   // Posición del planeta
+    float radio;     // Radio del planeta
+    GLfloat color[4]; // Color del planeta
+};
+
 //=======================  ESTADO  ============================//
 float naveX = 0.0f, naveY = 0.0f, naveZ = 0.0f;
 std::vector<Asteroide> asts;
 std::vector<Proyectil> pros;
 std::vector<Particula> parts;
 std::vector<Estrella> estrellas;
+std::vector<Planeta> planetas;
 int score = 0, lives = 3;
 bool gameOver = false;
 bool gameStarted = false;
-bool gamePaused = false;
 bool isNaveVisible = true; // Variable que indica si la nave es visible o no
+bool gamePaused = false;
 int lastLifeBonus = 0;  // Ãšltimo puntaje mÃºltiplo de 200 donde se otorgÃ³ vida
 bool mostrandoInstrucciones = true;
-
 
 //=======================  CAMARA  ============================//
 float camDist   = 15.0f;                 // distancia actual
@@ -54,10 +60,10 @@ float camYaw    = 0.0f;                  // giro horizontal (Â°)
 float camPitch  = 5.0f;                  // giro vertical   (Â°)
 float rotSens   = 0.15f;                 // sensibilidad rotacion (Â°/px)
 float zoomStep  = 1.0f;                  // paso de zoom (rueda)
-const float camPitchMax =  89.0f;
-const float camPitchMin = -89.0f;
+const float camPitchMax =  589.0f;
+const float camPitchMin = -589.0f;
 const float camDistMin  =   5.0f;
-const float camDistMax  =  40.0f;
+const float camDistMax  =  580.0f;
 /* Raton */
 bool mouseDown = false;
 int  lastX=0, lastY=0;
@@ -82,21 +88,21 @@ void crearEstrellas(void);
 void dibujarFondo(void);
 void dibujarAsteroideDetallado(float, int);
 void dibujarNaveDetallada(void);
-void dibujarBotonPausa(void);
-void dibujarPantallaPausa(void);
-void dibujarPantallaInstrucciones(void);
 void dibujarMinimapa(void);
 void mostrarCoordenadas(void);
+void dibujarSombra(float, float, float);  // Prototipo de la función de sombras
+void corazon(float x,float y);
 void actualizar(void);
+void crearPlaneta(void);
 void display(void);
-void reshape(int, int);
-void keyboard(unsigned char, int, int);
+void reshape(int,int);
+void keyboard(unsigned char,int,int);
 void special(int,int,int);
-void mouse(int, int, int, int);
-void motion(int, int);
+void mouse(int,int,int,int);
+void motion(int,int);
 void moverNaveRelativaACamara(float, float);
 void timer(int);
-
+void dibujarSkybox(void);  // Prototipo para la función dibujarSkybox
 //=======================  LOGICA DE JUEGO  ===================//
 bool colision(float x1,float y1,float z1,float r1,
               float x2,float y2,float z2,float r2)
@@ -104,7 +110,6 @@ bool colision(float x1,float y1,float z1,float r1,
     float dx=x1-x2, dy=y1-y2, dz=z1-z2;
     return sqrt(dx*dx+dy*dy+dz*dz) < (r1+r2);
 }
-
 
 //=======================  DIBUJO SIMPLE  =====================//
 void texto(float x, float y, const std::string& s, void* f=GLUT_BITMAP_HELVETICA_18)
@@ -209,8 +214,13 @@ void initGL()
     // Crear campo de estrellas
     crearEstrellas();
 
+    // Crear asteroides
     for(int i = 0; i < 5; ++i) {
         crearAsteroide();
+    }
+    // Crear planetas
+    for (int i = 0; i < 3; ++i) {
+        crearPlaneta();
     }
 }
 
@@ -222,6 +232,78 @@ void dibujarPantallaInicio()
     // Mensaje para presionar Enter
     texto(glutGet(GLUT_WINDOW_WIDTH) / 2 - 150, glutGet(GLUT_WINDOW_HEIGHT) / 2 - 10, "Presiona Enter para empezar el juego", GLUT_BITMAP_HELVETICA_18);
 }
+
+void crearPlaneta()
+{
+    planetas.clear();  // Limpiar lista de planetas antes de crear nuevos
+
+    // Crear planetas con posiciones fijas
+    Planeta p1;  // Planeta al frente
+    p1.x = -150.0f+naveX;  // Posición fija en X
+    p1.y = 0.0f+naveY;  // Posición fija en Y
+    p1.z = 300.0f; // Posición fija en Z (al frente)
+    p1.radio = 60.0f;  // Tamaño del planeta
+    p1.color[0] = 0.7f;  // Color del planeta Naranja
+    p1.color[1] = 0.3f;
+    p1.color[2] = 0.1f;
+    planetas.push_back(p1);
+
+    Planeta p2;  // Otro planeta al frente
+    p2.x = 150.0f+naveX;  // Desplazado a la derecha en X
+    p2.y = 50.0f+naveY;  // Sin cambio en Y
+    p2.z = 0.0f; // Posición fija en Z
+    p2.radio = 30.0f;
+    p2.color[0] = 0.3f; // Color del planeta Azul
+    p2.color[1] = 0.5f;
+    p2.color[2] = 0.9f;
+    planetas.push_back(p2);
+
+    Planeta p3;  // Planeta a la izquierda
+    p3.x = -100.0f+naveX;  // Desplazado a la izquierda en X
+    p3.y = -80.0f+naveY;  // Sin cambio en Y
+    p3.z = -130.0f; // Posición fija en Z
+    p3.radio = 80.0f;
+    p3.color[0] = 0.1f; // Color del planeta Verde
+    p3.color[1] = 0.8f;
+    p3.color[2] = 0.3f;
+    planetas.push_back(p3);
+
+    Planeta p4;  // Planeta atrás a la derecha
+    p4.x = 100.0f+naveX;  // Desplazado a la derecha en X
+    p4.y = 100.0f+naveY;  // Sin cambio en Y
+    p4.z = 200.0f; // Posición fija más lejos (atrás)
+    p4.radio = 30.0f;
+    p4.color[0] = 0.5f; // Color del planeta Púrpura
+    p4.color[1] = 0.2f;
+    p4.color[2] = 0.6f;
+    planetas.push_back(p4);
+
+    Planeta p5;  // Planeta atrás a la izquierda
+    p5.x = 190.0f+naveX;  // Desplazado a la izquierda en X
+    p5.y = 9.0f+naveY;  // Sin cambio en Y
+    p5.z = 300.0f; // Posición fija más lejos (atrás)
+    p5.radio = 45.0f;
+    p5.color[0] = 0.9f; // Color del planeta Amarillo
+    p5.color[1] = 0.7f;
+    p5.color[2] = 0.1f;
+    planetas.push_back(p5);
+}
+
+void dibujarPlanetas()
+{
+    for (size_t i = 0; i < planetas.size(); ++i) {
+        glPushMatrix();
+        glTranslatef(planetas[i].x, planetas[i].y, planetas[i].z);
+
+        // Aplicar el color del planeta
+        glColor3f(planetas[i].color[0], planetas[i].color[1], planetas[i].color[2]);
+
+        // Dibujar el planeta como una esfera
+        glutSolidSphere(planetas[i].radio, 16, 16);  // Radio de la esfera según el planeta
+        glPopMatrix();
+    }
+}
+
 
 void dibujarAsteroideDetallado(float radio, int tipo)
 {
@@ -495,7 +577,9 @@ void dibujarParticulas()
 
 void dibujarBotonPausa()
 {
-    if (!gameStarted || gameOver) return;
+    if (!gameStarted || gameOver) {
+        return;
+    }
 
     // Configurar para dibujo 2D
     glMatrixMode(GL_PROJECTION);
@@ -554,7 +638,9 @@ void dibujarBotonPausa()
 
 void dibujarPantallaPausa()
 {
-    if (!gamePaused) return;
+    if (!gamePaused) {
+        return;
+    }
 
     // Configurar para dibujo 2D
     glMatrixMode(GL_PROJECTION);
@@ -676,13 +762,19 @@ void dibujarMinimapa()
 
             // Solo dibujar si está dentro del minimapa
             if(mapX >= miniMapX && mapX <= miniMapX + miniMapSize &&
-               mapY >= miniMapY && mapY <= miniMapY + miniMapSize) {
+                    mapY >= miniMapY && mapY <= miniMapY + miniMapSize) {
 
                 // Color según tipo de asteroide
                 switch(asts[i].tipo) {
-                case 0: glColor3f(0.7f, 0.4f, 0.2f); break; // Rocoso
-                case 1: glColor3f(0.5f, 0.5f, 0.6f); break; // Metálico
-                case 2: glColor3f(0.3f, 0.5f, 0.9f); break; // Cristalino
+                case 0:
+                    glColor3f(0.7f, 0.4f, 0.2f);
+                    break; // Rocoso
+                case 1:
+                    glColor3f(0.5f, 0.5f, 0.6f);
+                    break; // Metálico
+                case 2:
+                    glColor3f(0.3f, 0.5f, 0.9f);
+                    break; // Cristalino
                 }
 
                 glPointSize(4);
@@ -706,7 +798,7 @@ void dibujarMinimapa()
             float mapY = centerY + dz * escala;
 
             if(mapX >= miniMapX && mapX <= miniMapX + miniMapSize &&
-               mapY >= miniMapY && mapY <= miniMapY + miniMapSize) {
+                    mapY >= miniMapY && mapY <= miniMapY + miniMapSize) {
                 glVertex2f(mapX, mapY);
             }
         }
@@ -729,11 +821,11 @@ void dibujarMinimapa()
 void crearEstrellas()
 {
     estrellas.clear();
-    for (int i = 0; i < 300; ++i) {
+    for (int i = 0; i < 400; ++i) {
         Estrella e;
 
         // Rango de distancias para las estrellas: aleatorio entre 20 y 100 para crear profundidad.
-        float distancia = rand() % 100 + 60;
+        float distancia = rand() % 200 + 60;
 
         // Crear estrellas en diferentes direcciones alrededor de la nave
         float anguloAzimut = rand() % 360; // Ãngulo azimutal (en el plano X-Y)
@@ -744,7 +836,7 @@ void crearEstrellas()
         e.y = distancia * cos(anguloElevacion * M_PI / 180.0f) * cos(anguloAzimut * M_PI / 180.0f);
         e.z = distancia * sin(anguloElevacion * M_PI / 180.0f);
 
-        // Brillo aleatorio de las estrellas
+        // Brillo aleatorio de las estrellas (de 0.3 a 1.0)
         e.brillo = 0.3f + (rand() % 70) / 100.0f;
 
         estrellas.push_back(e);
@@ -753,15 +845,15 @@ void crearEstrellas()
 
 void dibujarFondo()
 {
-    // Desactivar iluminaciÃ³n para el fondo
+    // Desactivar iluminacion para el fondo
     glDisable(GL_LIGHTING);
     glDisable(GL_DEPTH_TEST);
     // Dibuja una esfera gigante con un fondo estrellado
     glPushMatrix();
-    glTranslatef(naveX, naveY, naveZ);  // AsegÃºrate de que la esfera siga la nave
+    glTranslatef(naveX, naveY, naveZ);  // que la esfera siga la nave
 
     glColor3f(1.0f, 1.0f, 1.0f); // Color blanco para las estrellas, aunque puede tener textura
-    glutSolidSphere(200.0f, 50, 50);  // Esfera gigante que rodea a la nave
+    glutSolidSphere(800.0f, 50, 50);  // Esfera gigante que rodea a la nave
 
     glPopMatrix();
     // Dibujar estrellas
@@ -781,7 +873,7 @@ void dibujarFondo()
     }
     glEnd();
 
-    // Algunas estrellas mÃ¡s brillantes
+    // Algunas estrellas mas brillantes
     glPointSize(4);
     glBegin(GL_POINTS);
     for(size_t i = 0; i < estrellas.size(); i += 15) {
@@ -1007,25 +1099,6 @@ void actualizar()
         ++i;
     }
 }
-void dibujarSkybox()
-{
-    // Desactivar iluminaciÃ³n para el fondo
-    glDisable(GL_LIGHTING);
-    glDisable(GL_DEPTH_TEST);
-
-    // Dibuja una esfera gigante con un fondo estrellado
-    glPushMatrix();
-    glTranslatef(naveX, naveY, naveZ);  // AsegÃºrate de que la esfera siga la nave
-
-    glColor3f(1.0f, 1.0f, 1.0f); // Color blanco para las estrellas, aunque puede tener textura
-    glutSolidSphere(200.0f, 50, 50);  // Esfera gigante que rodea a la nave
-
-    glPopMatrix();
-
-    // Reactivar iluminaciÃ³n y profundidad
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_LIGHTING);
-}
 //=======================  DISPLAY  ===========================//
 void display()
 {
@@ -1034,12 +1107,11 @@ void display()
     glLoadIdentity();
     if (!gameStarted) {
         if (!mostrandoInstrucciones) {
-        dibujarPantallaInstrucciones();
+            dibujarPantallaInstrucciones();
         } else {
-        dibujarPantallaInicio();
+            dibujarPantallaInicio();
         }
     } else {
-        //dibujarSkybox();
         // Camara orbital
         float yawR = camYaw * 3.14159f / 180.0f, pitR = camPitch * 3.14159f / 180.0f;
         float cx = camDist * cos(pitR) * sin(yawR);
@@ -1049,7 +1121,7 @@ void display()
 
         // Dibujar fondo con estrellas primero
         dibujarFondo();
-
+        dibujarPlanetas();
         dibujarAsteroides();
         dibujarProyectiles();
         dibujarParticulas();
@@ -1059,7 +1131,7 @@ void display()
         texto(10, glutGet(GLUT_WINDOW_HEIGHT)-50, "Lives:");
         texto(10, glutGet(GLUT_WINDOW_HEIGHT)-75, "Position:");
         for(int i = 0; i < lives; ++i) {
-           corazon(70 + i * 30, glutGet(GLUT_WINDOW_HEIGHT) - 55);
+            corazon(70 + i * 30, glutGet(GLUT_WINDOW_HEIGHT) - 55);
         }
 
         // NUEVO: Mostrar coordenadas de la nave
@@ -1069,13 +1141,12 @@ void display()
         dibujarMinimapa();
 
         if (isNaveVisible) {
-           dibujarNave();
+            dibujarNave();
         }
         if (gameOver) {
-           texto(glutGet(GLUT_WINDOW_WIDTH) / 2 - 80, glutGet(GLUT_WINDOW_HEIGHT) / 2, "GAME OVER", GLUT_BITMAP_TIMES_ROMAN_24);
-           texto(glutGet(GLUT_WINDOW_WIDTH) / 2 - 80, glutGet(GLUT_WINDOW_HEIGHT) / 2 - 30, "Press R to restart");
+            texto(glutGet(GLUT_WINDOW_WIDTH) / 2 - 80, glutGet(GLUT_WINDOW_HEIGHT) / 2, "GAME OVER", GLUT_BITMAP_TIMES_ROMAN_24);
+            texto(glutGet(GLUT_WINDOW_WIDTH) / 2 - 80, glutGet(GLUT_WINDOW_HEIGHT) / 2 - 30, "Press R to restart");
         }
-
         dibujarBotonPausa();
         dibujarPantallaPausa();
     }
@@ -1089,12 +1160,11 @@ void reshape(int w,int h)
     glViewport(0,0,w,h);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    gluPerspective(45,(float)w/h,1,100);
+    gluPerspective(45,(float)w/h,1,600);
 }
 
 void mouse(int button, int state, int x, int y)
 {
-
     if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN && gameStarted && !gameOver) {
         // Convertir coordenadas de mouse (Y invertida)
         int mouseY = glutGet(GLUT_WINDOW_HEIGHT) - y;
@@ -1106,7 +1176,7 @@ void mouse(int button, int state, int x, int y)
         float buttonHeight = 25;
 
         if (x >= buttonX && x <= buttonX + buttonWidth &&
-            mouseY >= buttonY && mouseY <= buttonY + buttonHeight) {
+                mouseY >= buttonY && mouseY <= buttonY + buttonHeight) {
             gamePaused = !gamePaused;
             return;
         }
@@ -1168,6 +1238,7 @@ void motion(int x,int y)
     lastY=y;
 }
 
+
 void moverNaveRelativaACamara(float deltaX, float deltaY)
 {
     if(gameOver) {
@@ -1206,18 +1277,16 @@ void keyboard(unsigned char k, int x, int y)
     }
 
     if (!gameStarted) {
-       if (k == 13) {  // Enter key
-           if (mostrandoInstrucciones) {
-               mostrandoInstrucciones = false;  // Mostrar pantalla de inicio
-           } else {
-               gameStarted = true;
-               gameOver = false;
-           }
-       }
-       return;
+        if (k == 13) {  // Enter key
+            if (mostrandoInstrucciones) {
+                mostrandoInstrucciones = false;  // Mostrar pantalla de inicio
+            } else {
+                gameStarted = true;
+                gameOver = false;
+            }
+        }
+        return;
     }
-
-
 
     if (k == 'p' || k == 'P') {  // Pausar/Reanudar juego
         gamePaused = !gamePaused;
@@ -1233,7 +1302,6 @@ void keyboard(unsigned char k, int x, int y)
         parts.clear();
         gameOver = false;
         gameStarted = false;
-        gamePaused = false;
         explosionEnProceso = false;
         explosionTimer = 0;
         isNaveVisible = true;
@@ -1337,7 +1405,6 @@ int main(int argc, char** argv)
     glutCreateWindow("Nave vs. Asteroides 3D");
 
     initGL();
-
     glutDisplayFunc(display);
     glutReshapeFunc(reshape);
     glutKeyboardFunc(keyboard);
