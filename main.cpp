@@ -8,12 +8,13 @@
 #include <cmath>
 #include <ctime>
 #include <sstream>
+#include <iomanip>  // Para std::setprecision
 
 //=======================  ESTRUCTURAS  =======================//
 struct Asteroide {
     float x,y,z, vx,vy,vz, radio;
-    float rotX, rotY, rotZ; // Rotación para cada asteroide
-    float velRotX, velRotY, velRotZ; // Velocidad de rotación
+    float rotX, rotY, rotZ; // RotaciÃ³n para cada asteroide
+    float velRotX, velRotY, velRotZ; // Velocidad de rotaciÃ³n
     int tipo; // Tipo de asteroide (0, 1, 2)
     bool activo;
 };
@@ -42,13 +43,13 @@ int score = 0, lives = 3;
 bool gameOver = false;
 bool gameStarted = false;
 bool isNaveVisible = true; // Variable que indica si la nave es visible o no
-int lastLifeBonus = 0;  // Último puntaje múltiplo de 200 donde se otorgó vida
+int lastLifeBonus = 0;  // Ãšltimo puntaje mÃºltiplo de 200 donde se otorgÃ³ vida
 
 //=======================  CAMARA  ============================//
 float camDist   = 15.0f;                 // distancia actual
-float camYaw    = 0.0f;                  // giro horizontal (°)
-float camPitch  = 5.0f;                  // giro vertical   (°)
-float rotSens   = 0.15f;                 // sensibilidad rotacion (°/px)
+float camYaw    = 0.0f;                  // giro horizontal (Â°)
+float camPitch  = 5.0f;                  // giro vertical   (Â°)
+float rotSens   = 0.15f;                 // sensibilidad rotacion (Â°/px)
 float zoomStep  = 1.0f;                  // paso de zoom (rueda)
 const float camPitchMax =  89.0f;
 const float camPitchMin = -89.0f;
@@ -58,7 +59,7 @@ const float camDistMax  =  40.0f;
 bool mouseDown = false;
 int  lastX=0, lastY=0;
 
-int explosionTimer = 0;  // Temporizador para esperar después de la explosión
+int explosionTimer = 0;  // Temporizador para esperar despuÃ©s de la explosiÃ³n
 bool explosionEnProceso = false;
 
 //=======================  UTIL  ==============================//
@@ -70,16 +71,18 @@ std::string toStr(int n)
 }
 
 //=======================  PROTOS  ============================//
-void initGL();
-void crearAsteroide();
+void initGL(void);
+void crearAsteroide(void);
 void crearExplosion(float, float, float);
 void crearExplosionVidaExtra(float, float, float);
-void crearEstrellas();
-void dibujarFondo();
+void crearEstrellas(void);
+void dibujarFondo(void);
 void dibujarAsteroideDetallado(float, int);
-void dibujarNaveDetallada();
-void actualizar();
-void display();
+void dibujarNaveDetallada(void);
+void dibujarMinimapa(void);
+void mostrarCoordenadas(void);
+void actualizar(void);
+void display(void);
 void reshape(int,int);
 void keyboard(unsigned char,int,int);
 void special(int,int,int);
@@ -134,7 +137,7 @@ void corazon(float x,float y)
     glColor3f(1,0,0);
     glTranslatef(x+10,y+10,0);
     glScalef(1,1,1);
-    //Primera mitad superior del corazón (lado izquierdo)
+    //Primera mitad superior del corazÃ³n (lado izquierdo)
     glBegin(GL_TRIANGLE_FAN);
     glVertex2f(0,0);
     for(int i=0; i<=180; i+=10) {
@@ -142,7 +145,7 @@ void corazon(float x,float y)
         glVertex2f(5*cos(r)-5,5*sin(r)+5);
     }
     glEnd();
-    //Segunda mitad superior del corazón (lado derecho)
+    //Segunda mitad superior del corazÃ³n (lado derecho)
     glBegin(GL_TRIANGLE_FAN);
     glVertex2f(0,0);
     for(int i=0; i<=180; i+=10) {
@@ -171,11 +174,11 @@ void initGL()
     glEnable(GL_LIGHTING);
     glEnable(GL_LIGHT0);
 
-    // Configuración de luz mejorada para mejor aspecto visual
-    GLfloat amb[] = {0.3f, 0.3f, 0.4f, 1.0f};  // Luz ambiental más suave
-    GLfloat dif[] = {0.9f, 0.9f, 0.8f, 1.0f};  // Luz difusa más cálida
+    // ConfiguraciÃ³n de luz mejorada para mejor aspecto visual
+    GLfloat amb[] = {0.3f, 0.3f, 0.4f, 1.0f};  // Luz ambiental mÃ¡s suave
+    GLfloat dif[] = {0.9f, 0.9f, 0.8f, 1.0f};  // Luz difusa mÃ¡s cÃ¡lida
     GLfloat spec[] = {1.0f, 1.0f, 1.0f, 1.0f}; // Especular para brillos
-    GLfloat pos[] = {5.0f, 10.0f, 10.0f, 1.0f}; // Posición de luz
+    GLfloat pos[] = {5.0f, 10.0f, 10.0f, 1.0f}; // PosiciÃ³n de luz
 
     glLightfv(GL_LIGHT0, GL_AMBIENT, amb);
     glLightfv(GL_LIGHT0, GL_DIFFUSE, dif);
@@ -216,10 +219,10 @@ void dibujarPantallaInicio()
 void dibujarAsteroideDetallado(float radio, int tipo)
 {
     switch(tipo) {
-    case 0: // Asteroide rocoso con cráteres
+    case 0: // Asteroide rocoso con crÃ¡teres
         glPushMatrix();
         glutSolidSphere(radio, 12, 8);
-        // Agregar pequeños cráteres
+        // Agregar pequeÃ±os crÃ¡teres
         glColor3f(0.5f, 0.3f, 0.1f);
         for(int i = 0; i < 8; i++) {
             glPushMatrix();
@@ -232,10 +235,10 @@ void dibujarAsteroideDetallado(float radio, int tipo)
         glPopMatrix();
         break;
 
-    case 1: // Asteroide metálico
+    case 1: // Asteroide metÃ¡lico
         glPushMatrix();
         glutSolidSphere(radio * 0.9f, 10, 8);
-        // Agregar protuberancias metálicas
+        // Agregar protuberancias metÃ¡licas
         glColor3f(0.6f, 0.6f, 0.5f);
         for(int i = 0; i < 6; i++) {
             glPushMatrix();
@@ -249,7 +252,7 @@ void dibujarAsteroideDetallado(float radio, int tipo)
 
     case 2: // Asteroide cristalino
         glPushMatrix();
-        // Núcleo principal
+        // NÃºcleo principal
         glutSolidSphere(radio * 0.8f, 8, 6);
         // Cristales sobresalientes
         glColor3f(0.4f, 0.6f, 0.8f);
@@ -274,10 +277,10 @@ void dibujarAsteroideDetallado(float radio, int tipo)
 
 void dibujarNaveDetallada()
 {
-    // Cuerpo principal de la nave (más detallado)
+    // Cuerpo principal de la nave (mÃ¡s detallado)
     glPushMatrix();
 
-    // Fuselaje principal - azul metálico
+    // Fuselaje principal - azul metÃ¡lico
     GLfloat colPrincipal[] = {0.2f, 0.6f, 1.0f, 1.0f};
     glMaterialfv(GL_FRONT, GL_DIFFUSE, colPrincipal);
     glPushMatrix();
@@ -330,7 +333,7 @@ void dibujarNaveDetallada()
     gluCylinder(gluNewQuadric(), 0.15f, 0.15f, 0.6f, 8, 4);
     glPopMatrix();
 
-    // Cañón frontal
+    // CaÃ±Ã³n frontal
     GLfloat colCanon[] = {0.6f, 0.6f, 0.6f, 1.0f};
     glMaterialfv(GL_FRONT, GL_DIFFUSE, colCanon);
     glPushMatrix();
@@ -339,7 +342,7 @@ void dibujarNaveDetallada()
     gluCylinder(gluNewQuadric(), 0.08f, 0.08f, 0.4f, 6, 4);
     glPopMatrix();
 
-    // Luces de navegación (pequeñas esferas brillantes)
+    // Luces de navegaciÃ³n (pequeÃ±as esferas brillantes)
     GLfloat colLuces[] = {1.0f, 1.0f, 0.2f, 1.0f};
     glMaterialfv(GL_FRONT, GL_DIFFUSE, colLuces);
 
@@ -363,16 +366,16 @@ void dibujarNave()
     glPushMatrix();
     glTranslatef(naveX, naveY, naveZ);
 
-    // NUEVO: Orientar la nave según la posición de la cámara
-    // Calcular la rotación necesaria para que la nave mire hacia la cámara
+    // NUEVO: Orientar la nave segÃºn la posiciÃ³n de la cÃ¡mara
+    // Calcular la rotaciÃ³n necesaria para que la nave mire hacia la cÃ¡mara
     float yawR = camYaw * 3.14159f / 180.0f;
     float pitR = camPitch * 3.14159f / 180.0f;
 
-    // Rotar la nave para que se mantenga de frente a la cámara
-    glRotatef(camYaw, 0, 1, 0);        // Rotación horizontal (yaw)
-    glRotatef(-camPitch, 1, 0, 0);     // Rotación vertical (pitch) - negativo para invertir
+    // Rotar la nave para que se mantenga de frente a la cÃ¡mara
+    glRotatef(camYaw, 0, 1, 0);        // RotaciÃ³n horizontal (yaw)
+    glRotatef(-camPitch, 1, 0, 0);     // RotaciÃ³n vertical (pitch) - negativo para invertir
 
-    // Pequeña animación de oscilación cuando se mueve
+    // PequeÃ±a animaciÃ³n de oscilaciÃ³n cuando se mueve
     static float tiempo = 0;
     tiempo += 0.1f;
     if(naveX != 0 || naveY != 0) {
@@ -390,21 +393,21 @@ void dibujarAsteroides()
             glPushMatrix();
             glTranslatef(asts[i].x, asts[i].y, asts[i].z);
 
-            // Aplicar rotación del asteroide
+            // Aplicar rotaciÃ³n del asteroide
             glRotatef(asts[i].rotX, 1, 0, 0);
             glRotatef(asts[i].rotY, 0, 1, 0);
             glRotatef(asts[i].rotZ, 0, 0, 1);
 
-            // Color base según tipo
+            // Color base segÃºn tipo
             GLfloat col[4];
             switch(asts[i].tipo) {
-            case 0: // Rocoso - marrón
+            case 0: // Rocoso - marrÃ³n
                 col[0] = 0.7f;
                 col[1] = 0.4f;
                 col[2] = 0.2f;
                 col[3] = 1.0f;
                 break;
-            case 1: // Metálico - gris
+            case 1: // MetÃ¡lico - gris
                 col[0] = 0.5f;
                 col[1] = 0.5f;
                 col[2] = 0.6f;
@@ -460,7 +463,7 @@ void dibujarProyectiles()
             glVertex3f(-0.05f, -0.05f, -0.15f);
             glEnd();
 
-            // Añadir un pequeño efecto de brillo
+            // AÃ±adir un pequeÃ±o efecto de brillo
             GLfloat colBrillo[] = {1.0f, 1.0f, 1.0f, 1.0f};
             glMaterialfv(GL_FRONT, GL_DIFFUSE, colBrillo);
             glutSolidSphere(0.03f, 6, 4);
@@ -483,6 +486,126 @@ void dibujarParticulas()
     glEnable(GL_LIGHTING);
 }
 
+void dibujarMinimapa()
+{
+    // Configurar viewport para el minimapa
+    glMatrixMode(GL_PROJECTION);
+    glPushMatrix();
+    glLoadIdentity();
+    glOrtho(0, glutGet(GLUT_WINDOW_WIDTH), 0, glutGet(GLUT_WINDOW_HEIGHT), -1, 1);
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glLoadIdentity();
+
+    glDisable(GL_LIGHTING);
+    glDisable(GL_DEPTH_TEST);
+
+    // Posición y tamaño del minimapa (esquina superior derecha)
+    float miniMapX = glutGet(GLUT_WINDOW_WIDTH) - 140;
+    float miniMapY = glutGet(GLUT_WINDOW_HEIGHT) - 160;
+    float miniMapSize = 120;
+    float escala = 8.0f; // Factor de escala para el minimapa
+
+    // Dibujar fondo del minimapa
+    glColor4f(0.1f, 0.1f, 0.3f, 0.8f);
+    glBegin(GL_QUADS);
+    glVertex2f(miniMapX, miniMapY);
+    glVertex2f(miniMapX + miniMapSize, miniMapY);
+    glVertex2f(miniMapX + miniMapSize, miniMapY + miniMapSize);
+    glVertex2f(miniMapX, miniMapY + miniMapSize);
+    glEnd();
+
+    // Dibujar borde del minimapa
+    glColor3f(0.0f, 1.0f, 0.0f);
+    glLineWidth(2);
+    glBegin(GL_LINE_LOOP);
+    glVertex2f(miniMapX, miniMapY);
+    glVertex2f(miniMapX + miniMapSize, miniMapY);
+    glVertex2f(miniMapX + miniMapSize, miniMapY + miniMapSize);
+    glVertex2f(miniMapX, miniMapY + miniMapSize);
+    glEnd();
+
+    // Centro del minimapa
+    float centerX = miniMapX + miniMapSize / 2;
+    float centerY = miniMapY + miniMapSize / 2;
+
+    // Dibujar nave en el centro del minimapa
+    glColor3f(0.2f, 0.6f, 1.0f);
+    glPointSize(6);
+    glBegin(GL_POINTS);
+    glVertex2f(centerX, centerY);
+    glEnd();
+
+    // Dibujar triángulo para indicar dirección de la nave
+    glColor3f(1.0f, 1.0f, 1.0f);
+    glBegin(GL_TRIANGLES);
+    glVertex2f(centerX, centerY + 8);
+    glVertex2f(centerX - 4, centerY - 4);
+    glVertex2f(centerX + 4, centerY - 4);
+    glEnd();
+
+    // Dibujar asteroides en el minimapa
+    for(size_t i = 0; i < asts.size(); ++i) {
+        if(asts[i].activo) {
+            float dx = asts[i].x - naveX;
+            float dz = asts[i].z - naveZ;
+
+            // Escalar las coordenadas para el minimapa
+            float mapX = centerX + dx * escala;
+            float mapY = centerY + dz * escala;
+
+            // Solo dibujar si está dentro del minimapa
+            if(mapX >= miniMapX && mapX <= miniMapX + miniMapSize &&
+               mapY >= miniMapY && mapY <= miniMapY + miniMapSize) {
+
+                // Color según tipo de asteroide
+                switch(asts[i].tipo) {
+                case 0: glColor3f(0.7f, 0.4f, 0.2f); break; // Rocoso
+                case 1: glColor3f(0.5f, 0.5f, 0.6f); break; // Metálico
+                case 2: glColor3f(0.3f, 0.5f, 0.9f); break; // Cristalino
+                }
+
+                glPointSize(4);
+                glBegin(GL_POINTS);
+                glVertex2f(mapX, mapY);
+                glEnd();
+            }
+        }
+    }
+
+    // Dibujar proyectiles en el minimapa
+    glColor3f(1.0f, 1.0f, 0.2f);
+    glPointSize(2);
+    glBegin(GL_POINTS);
+    for(size_t i = 0; i < pros.size(); ++i) {
+        if(pros[i].activo) {
+            float dx = pros[i].x - naveX;
+            float dz = pros[i].z - naveZ;
+
+            float mapX = centerX + dx * escala;
+            float mapY = centerY + dz * escala;
+
+            if(mapX >= miniMapX && mapX <= miniMapX + miniMapSize &&
+               mapY >= miniMapY && mapY <= miniMapY + miniMapSize) {
+                glVertex2f(mapX, mapY);
+            }
+        }
+    }
+    glEnd();
+
+    // Título del minimapa
+    glColor3f(0.0f, 1.0f, 0.0f);
+    texto(miniMapX, miniMapY + miniMapSize + 10, "Radar", GLUT_BITMAP_HELVETICA_18);
+
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_LIGHTING);
+
+    glPopMatrix();
+    glMatrixMode(GL_PROJECTION);
+    glPopMatrix();
+    glMatrixMode(GL_MODELVIEW);
+}
+
 void crearEstrellas()
 {
     estrellas.clear();
@@ -493,10 +616,10 @@ void crearEstrellas()
         float distancia = rand() % 100 + 60;
 
         // Crear estrellas en diferentes direcciones alrededor de la nave
-        float anguloAzimut = rand() % 360; // Ángulo azimutal (en el plano X-Y)
-        float anguloElevacion = rand() % 180 - 90; // Ángulo de elevación (para la dirección Z, -90 a 90)
+        float anguloAzimut = rand() % 360; // Ãngulo azimutal (en el plano X-Y)
+        float anguloElevacion = rand() % 180 - 90; // Ãngulo de elevaciÃ³n (para la direcciÃ³n Z, -90 a 90)
 
-        // Convertimos estos ángulos a coordenadas 3D
+        // Convertimos estos Ã¡ngulos a coordenadas 3D
         e.x = distancia * cos(anguloElevacion * M_PI / 180.0f) * sin(anguloAzimut * M_PI / 180.0f);
         e.y = distancia * cos(anguloElevacion * M_PI / 180.0f) * cos(anguloAzimut * M_PI / 180.0f);
         e.z = distancia * sin(anguloElevacion * M_PI / 180.0f);
@@ -510,12 +633,12 @@ void crearEstrellas()
 
 void dibujarFondo()
 {
-    // Desactivar iluminación para el fondo
+    // Desactivar iluminaciÃ³n para el fondo
     glDisable(GL_LIGHTING);
     glDisable(GL_DEPTH_TEST);
     // Dibuja una esfera gigante con un fondo estrellado
     glPushMatrix();
-    glTranslatef(naveX, naveY, naveZ);  // Asegúrate de que la esfera siga la nave
+    glTranslatef(naveX, naveY, naveZ);  // AsegÃºrate de que la esfera siga la nave
 
     glColor3f(1.0f, 1.0f, 1.0f); // Color blanco para las estrellas, aunque puede tener textura
     glutSolidSphere(200.0f, 50, 50);  // Esfera gigante que rodea a la nave
@@ -538,7 +661,7 @@ void dibujarFondo()
     }
     glEnd();
 
-    // Algunas estrellas más brillantes
+    // Algunas estrellas mÃ¡s brillantes
     glPointSize(4);
     glBegin(GL_POINTS);
     for(size_t i = 0; i < estrellas.size(); i += 15) {
@@ -583,7 +706,7 @@ void crearAsteroide()
     a.velRotX = (rand() % 200 - 100) / 100.0f;
     a.velRotY = (rand() % 200 - 100) / 100.0f;
     a.velRotZ = (rand() % 200 - 100) / 100.0f;
-    a.tipo = rand() % 3; // 0=rocoso, 1=metálico, 2=cristalino
+    a.tipo = rand() % 3; // 0=rocoso, 1=metÃ¡lico, 2=cristalino
 
     asts.push_back(a);
 }
@@ -613,9 +736,20 @@ void crearExplosionVidaExtra(float x, float y, float z)
         p.vx = ((rand() % 100) / 50.0f) - 1.0f;
         p.vy = ((rand() % 100) / 50.0f) - 1.0f;
         p.vz = ((rand() % 100) / 50.0f) - 1.0f;
-        p.vida = 1.5f; // Duración más larga
+        p.vida = 1.5f; // DuraciÃ³n mÃ¡s larga
         parts.push_back(p);
     }
+}
+
+void mostrarCoordenadas()
+{
+    // Formatear las coordenadas con 1 decimal
+    std::stringstream ss;
+    ss << std::fixed << std::setprecision(1)
+       << "(" << naveX << ", " << naveY << ")";
+
+    // Mostrar debajo de las vidas
+    texto(10, glutGet(GLUT_WINDOW_HEIGHT) - 100, ss.str(), GLUT_BITMAP_HELVETICA_18);
 }
 
 //=======================  ACTUALIZAR MUNDO  ==================//
@@ -654,7 +788,7 @@ void actualizar()
         a.y+=a.vy;
         a.z+=a.vz;
 
-        // Actualizar rotación de asteroides
+        // Actualizar rotaciÃ³n de asteroides
         a.rotX += a.velRotX;
         a.rotY += a.velRotY;
         a.rotZ += a.velRotZ;
@@ -732,7 +866,7 @@ void actualizar()
                 lastLifeBonus = currentMultiple;
 
                 // Crear efecto visual especial para vida extra
-                crearExplosion(naveX, naveY, naveZ + 2); // Explosión verde más arriba
+                crearExplosion(naveX, naveY, naveZ + 2); // ExplosiÃ³n verde mÃ¡s arriba
             }
             continue;
         }
@@ -755,20 +889,20 @@ void actualizar()
 }
 void dibujarSkybox()
 {
-    // Desactivar iluminación para el fondo
+    // Desactivar iluminaciÃ³n para el fondo
     glDisable(GL_LIGHTING);
     glDisable(GL_DEPTH_TEST);
 
     // Dibuja una esfera gigante con un fondo estrellado
     glPushMatrix();
-    glTranslatef(naveX, naveY, naveZ);  // Asegúrate de que la esfera siga la nave
+    glTranslatef(naveX, naveY, naveZ);  // AsegÃºrate de que la esfera siga la nave
 
     glColor3f(1.0f, 1.0f, 1.0f); // Color blanco para las estrellas, aunque puede tener textura
     glutSolidSphere(200.0f, 50, 50);  // Esfera gigante que rodea a la nave
 
     glPopMatrix();
 
-    // Reactivar iluminación y profundidad
+    // Reactivar iluminaciÃ³n y profundidad
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_LIGHTING);
 }
@@ -799,15 +933,23 @@ void display()
         // UI
         texto(10, glutGet(GLUT_WINDOW_HEIGHT)-25, "Score: " + toStr(score));
         texto(10, glutGet(GLUT_WINDOW_HEIGHT)-50, "Lives:");
+        texto(10, glutGet(GLUT_WINDOW_HEIGHT)-75, "Position:");
         for(int i = 0; i < lives; ++i) {
-            corazon(70 + i * 30, glutGet(GLUT_WINDOW_HEIGHT) - 55);
+           corazon(70 + i * 30, glutGet(GLUT_WINDOW_HEIGHT) - 55);
         }
+
+        // NUEVO: Mostrar coordenadas de la nave
+        mostrarCoordenadas();
+
+        // NUEVO: Dibujar minimapa
+        dibujarMinimapa();
+
         if (isNaveVisible) {
-            dibujarNave();
+           dibujarNave();
         }
         if (gameOver) {
-            texto(glutGet(GLUT_WINDOW_WIDTH) / 2 - 80, glutGet(GLUT_WINDOW_HEIGHT) / 2, "GAME OVER", GLUT_BITMAP_TIMES_ROMAN_24);
-            texto(glutGet(GLUT_WINDOW_WIDTH) / 2 - 80, glutGet(GLUT_WINDOW_HEIGHT) / 2 - 30, "Press R to restart");
+           texto(glutGet(GLUT_WINDOW_WIDTH) / 2 - 80, glutGet(GLUT_WINDOW_HEIGHT) / 2, "GAME OVER", GLUT_BITMAP_TIMES_ROMAN_24);
+           texto(glutGet(GLUT_WINDOW_WIDTH) / 2 - 80, glutGet(GLUT_WINDOW_HEIGHT) / 2 - 30, "Press R to restart");
         }
     }
 
@@ -887,7 +1029,7 @@ void moverNaveRelativaACamara(float deltaX, float deltaY)
         return;
     }
 
-    // Convertir el movimiento relativo a la cámara
+    // Convertir el movimiento relativo a la cÃ¡mara
     float yawR = camYaw * 3.14159f / 180.0f;
 
     // Calcular el movimiento en coordenadas del mundo
@@ -898,17 +1040,17 @@ void moverNaveRelativaACamara(float deltaX, float deltaY)
     naveY += worldDeltaY;
 
     // Limitar el movimiento de la nave
-    if (naveX > 10) {
-        naveX = 10;
+    if (naveX > 15) {
+        naveX = 15;
     }
-    if (naveX < -10) {
-        naveX = -10;
+    if (naveX < -15) {
+        naveX = -15;
     }
-    if (naveY > 10) {
-        naveY = 10;
+    if (naveY > 15) {
+        naveY = 15;
     }
-    if (naveY < -10) {
-        naveY = -10;
+    if (naveY < -15) {
+        naveY = -15;
     }
 }
 
@@ -942,13 +1084,13 @@ void keyboard(unsigned char k, int x, int y)
     }
 
     if (k == ' ' && !gameOver) {  // Disparar
-        // NUEVO: Disparar en la dirección que apunta la nave (hacia la cámara)
+        // NUEVO: Disparar en la direccion que apunta la nave (hacia la camara)
         Proyectil p;
         p.x = naveX;
         p.y = naveY;
         p.z = naveZ;
 
-        // Calcular la dirección del disparo relativa a la cámara
+        // Calcular la direccion del disparo relativa a la camara
         float yawR = camYaw * 3.14159f / 180.0f;
         float pitR = camPitch * 3.14159f / 180.0f;
 
@@ -974,19 +1116,19 @@ void keyboard(unsigned char k, int x, int y)
         }
     }
 
-    /* Movimiento de la nave RELATIVO A LA CÁMARA */
+    /* Movimiento de la nave RELATIVO A LA CAMARA */
     if (!gameOver) {
         if (k == 'w' || k == 'W') {
-            moverNaveRelativaACamara(0, 0.5f);  // Adelante relativo a la cámara
+            moverNaveRelativaACamara(0, 0.5f);  // Adelante relativo a la cÃ¡mara
         }
         if (k == 's' || k == 'S') {
-            moverNaveRelativaACamara(0, -0.5f); // Atrás relativo a la cámara
+            moverNaveRelativaACamara(0, -0.5f); // AtrÃ¡s relativo a la cÃ¡mara
         }
         if (k == 'a' || k == 'A') {
-            moverNaveRelativaACamara(-0.5f, 0); // Izquierda relativo a la cámara
+            moverNaveRelativaACamara(-0.5f, 0); // Izquierda relativo a la cÃ¡mara
         }
         if (k == 'd' || k == 'D') {
-            moverNaveRelativaACamara(0.5f, 0);  // Derecha relativo a la cámara
+            moverNaveRelativaACamara(0.5f, 0);  // Derecha relativo a la cÃ¡mara
         }
     }
 }
